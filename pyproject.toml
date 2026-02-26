@@ -11,5 +11,6 @@ dependencies = [
 [dependency-groups]
 dev = [
     "lark-oapi>=1.5.3",
+    "pytest>=9.0.2",
     "ruff>=0.15.2",
 ]
