@@ -28,6 +28,8 @@ class LarkBase:
         """
         self.app_id = app_id
         self.app_sercet = app_sercet
+        if not self.app_id or not self.app_sercet:
+            raise ValueError("app_id/app_secret 不能为空，可通过参数或环境变量提供")
         self.__builder_client()
 
     def __builder_client(self):
