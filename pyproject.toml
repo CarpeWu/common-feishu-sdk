@@ -1,16 +1,15 @@
 [project]
 name = "common-feishu-sdk"
-version = "0.1.0"
-description = "Add your description here"
+version = "0.1.1"
+description = "[引力琥珀]飞书SDK版本构建"
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = [
-    "pydantic>=2.12.5",
-]
+dependencies = []
 
 [dependency-groups]
 dev = [
     "lark-oapi>=1.5.3",
+    "pydantic>=2.12.5",
     "pytest>=9.0.2",
     "ruff>=0.15.2",
 ]
