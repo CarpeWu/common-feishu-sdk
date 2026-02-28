@@ -1,5 +1,5 @@
 [project]
-name = "common-feishu-sdk"
+name = "ylhp-common-feishu-sdk"
 version = "0.1.1"
 description = "[引力琥珀]飞书SDK版本构建"
 readme = "README.md"
