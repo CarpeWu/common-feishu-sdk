@@ -1,0 +1,36 @@
+{
+  "hooks": [
+    {
+      "event": "PostToolUse",
+      "matcher": "tool == \"Edit\" && tool_input.file_path matches \"\\\\.(py)$\"",
+      "hooks": [
+        {
+          "type": "command",
+          "command": "uv run ruff check --fix $(echo $TOOL_INPUT | jq -r '.file_path') 2>&1 | tail -5"
+        }
+      ],
+      "description": "编辑 Python 文件后自动 ruff check"
+    },
+    {
+      "event": "PreToolUse",
+      "matcher": "tool == \"Edit\" && tool_input.file_path matches \"(feishu-api\\.md|design\\.md|CLAUDE\\.md)\"",
+      "hooks": [
+        {
+          "type": "command",
+          "command": "echo '⚠️ 你正在修改核心文档。请确认这是有意为之，而非实现代码时误改。'"
+        }
+      ],
+      "description": "修改核心文档时提醒"
+    },
+    {
+      "event": "Stop",
+      "hooks": [
+        {
+          "type": "command",
+          "command": "uv run pytest --tb=line -q 2>&1 | tail -3"
+        }
+      ],
+      "description": "每轮对话结束时自动跑测试"
+    }
+  ]
+}
