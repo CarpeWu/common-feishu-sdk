@@ -55,7 +55,16 @@ E) 🐛 修复 bug"
 1. 检查代码是否符合 .claude/rules/ 中的所有规则
 2. 运行 `uv run ruff check src/ tests/ && uv run ruff format src/ tests/`
 3. 再次运行 `uv run pytest`
-4. 输出："✅ 重构完成。回复'提交'进入审查阶段。"
+4. 输出："✅ 重构完成。回复'继续'进入文档同步阶段。"
+
+### 阶段 4.5 📄 文档同步 (Doc Sync)
+触发：重构阶段完成后，自动执行（不需要开发者指示）
+动作：
+1. 按 .claude/rules/07-doc-sync.md 的规则逐项检查
+2. CLAUDE.md 和 CHANGELOG.md：直接更新，告知开发者改了什么
+3. docs/design.md：只报告差异，等开发者决定 A 或 B
+4. 输出文档同步检查表
+5. 告知："📄 文档同步完成。回复'继续'进入审查阶段。"
 
 ### 阶段 5️⃣ 审查与提交 (Review & Commit)
 触发：重构阶段完成
