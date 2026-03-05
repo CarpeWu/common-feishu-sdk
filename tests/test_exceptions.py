@@ -14,7 +14,6 @@ import logging
 
 import pytest
 
-# 这些导入在实现后会成功
 from ylhp_common_feishu_sdk.exceptions import (
     FeishuAPIError,
     FeishuAuthError,
@@ -97,7 +96,7 @@ class TestExceptionAttributes:
     def test_retryable_attributes(self) -> None:
         """各异常类 retryable 值应该正确。"""
         # 不可重试
-        assert FeishuError().retryable is False
+        assert FeishuError("error").retryable is False
         assert FeishuConfigError("config error").retryable is False
         assert FeishuValidationError("field", "detail").retryable is False
         assert FeishuAPIError(10001, "msg").retryable is False
@@ -130,11 +129,19 @@ class TestUnknownCodeWarning:
 
     def test_unknown_code_logs_warning(self, caplog: pytest.LogCaptureFixture) -> None:
         """未知错误码应该触发 logger.warning。"""
-        with caplog.at_level(logging.WARNING, logger="ylhp_common_feishu_sdk"):
-            err = translate_error(88888, "mystery error", "log_unknown")
+        # 确保 logger 传播到 caplog
+        sdk_logger = logging.getLogger("ylhp_common_feishu_sdk")
+        original_propagate = sdk_logger.propagate
+        sdk_logger.propagate = True
 
-        # 应该有一个 warning 日志
-        assert len(caplog.records) >= 1
-        assert any("未知飞书错误码" in r.message for r in caplog.records)
-        # 返回 FeishuAPIError 作为兜底
-        assert isinstance(err, FeishuAPIError)
+        try:
+            with caplog.at_level(logging.WARNING, logger="ylhp_common_feishu_sdk"):
+                err = translate_error(88888, "mystery error", "log_unknown")
+
+            # 应该有一个 warning 日志
+            assert len(caplog.records) >= 1
+            assert any("未知飞书错误码" in r.message for r in caplog.records)
+            # 返回 FeishuAPIError 作为兜底
+            assert isinstance(err, FeishuAPIError)
+        finally:
+            sdk_logger.propagate = original_propagate
