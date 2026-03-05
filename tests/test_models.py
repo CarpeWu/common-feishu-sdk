@@ -5,6 +5,7 @@
 - frozen 不可变
 - has_more 逻辑
 """
+
 from __future__ import annotations
 
 from ylhp_common_feishu_sdk.models import PageResult
@@ -14,7 +15,7 @@ class TestPageResult:
     """测试 PageResult 分页结果类。"""
 
     def test_page_result_basic(self) -> None:
-        """基本分页结果。 """
+        """基本分页结果。"""
         result: PageResult[str] = PageResult(
             items=["a", "b", "c"],
             page_token="next_token",
@@ -25,7 +26,7 @@ class TestPageResult:
         assert result.has_more is True
 
     def test_page_result_no_more(self) -> None:
-        """没有更多数据时。 """
+        """没有更多数据时。"""
         result: PageResult[int] = PageResult(
             items=[1, 2, 3],
             page_token=None,
@@ -36,7 +37,7 @@ class TestPageResult:
         assert result.has_more is False
 
     def test_page_result_empty(self) -> None:
-        """空结果。 """
+        """空结果。"""
         result: PageResult[str] = PageResult(
             items=[],
             page_token=None,
@@ -47,7 +48,7 @@ class TestPageResult:
         assert result.has_more is False
 
     def test_page_result_frozen(self) -> None:
-        """PageResult 应该是不可变的。 """
+        """PageResult 应该是不可变的。"""
         result = PageResult(items=["a"], page_token=None, has_more=False)
         try:
             result.items.append("b")  # list 本身是可变的，但这不影响 frozen

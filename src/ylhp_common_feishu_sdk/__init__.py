@@ -1,23 +1,45 @@
-# TODO: 更新公共导出
-# 参考: docs/ylhp-common-feishu-sdk 需求与架构设计文档.md
+"""ylhp-common-feishu-sdk 公共导出。
 
-# from .client import Feishu
-# from .config import FeishuConfig
-# from .exceptions import (
-#     FeishuError,
-#     FeishuConfigError,
-#     FeishuValidationError,
-#     FeishuAPIError,
-#     FeishuAuthError,
-#     FeishuRateLimitError,
-#     FeishuServerError,
-# )
-# from .models import (
-#     UserInfo,
-#     UserDetail,
-#     Department,
-#     PageResult,
-# )
-# from .log import get_logger, setup_sdk_logger
+基于飞书官方 lark-oapi SDK 的薄封装层。
+"""
 
-# __all__ = [...]
+from __future__ import annotations
+
+__version__ = "0.1.0"
+
+from ylhp_common_feishu_sdk.client import Feishu
+from ylhp_common_feishu_sdk.config import FeishuConfig
+from ylhp_common_feishu_sdk.exceptions import (
+    FeishuAPIError,
+    FeishuAuthError,
+    FeishuConfigError,
+    FeishuError,
+    FeishuRateLimitError,
+    FeishuServerError,
+    FeishuValidationError,
+    translate_error,
+)
+from ylhp_common_feishu_sdk.log import SensitiveFilter, setup_sdk_logger
+from ylhp_common_feishu_sdk.models import PageResult
+
+__all__ = [
+    "__version__",
+    # Client
+    "Feishu",
+    # Config
+    "FeishuConfig",
+    # Exceptions
+    "FeishuError",
+    "FeishuConfigError",
+    "FeishuValidationError",
+    "FeishuAPIError",
+    "FeishuAuthError",
+    "FeishuRateLimitError",
+    "FeishuServerError",
+    "translate_error",
+    # Log
+    "SensitiveFilter",
+    "setup_sdk_logger",
+    # Models
+    "PageResult",
+]

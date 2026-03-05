@@ -4,16 +4,14 @@
   - 入参（Pydantic BaseModel）: 调用 API 前严格校验，  - 出参（dataclass）: 从 API 响应构造，使用 getattr 兜底
   - dataclass 比 Pydantic 轻量，且可以用 frozen=True 保证不可变
 """
+
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import Generic, TypeVar
-
-T = TypeVar("T")
+from dataclasses import dataclass
 
 
 @dataclass(frozen=True)
-class PageResult(Generic[T]):
+class PageResult[T]:
     """分页查询结果。
 
     Attributes:
