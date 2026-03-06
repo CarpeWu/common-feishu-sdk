@@ -5,6 +5,21 @@
   - propagate=False，不影响宿主应用的 root logger
   - 脱敏 Filter 通过正则匹配，将敏感信息替换为掩码
   - 幂等: 多次调用不会重复添加 handler
+
+脱敏设计原则:
+  - 最小暴露: 只保留用于调试的前几位，其余全部掩码
+  - 不误杀: 正则尽量精确，避免把正常业务数据误脱敏
+  - 可定位: 保留令牌前缀/前几位，方便在多条日志间关联同一令牌
+  - 全链路: HTTP 请求、响应、异常堆栈中的凭证全部覆盖
+  - 零侵入: 通过 logging.Filter 统一处理，业务代码无需修改
+
+飞书令牌格式（实测确认）:
+  - user_access_token: eyJ 开头的三段式 JWT (ES256 签名)
+  - tenant_access_token: t- 前缀 + 至少 20 字符
+  - app_access_token: a- 前缀 + 至少 20 字符
+  - App Secret: 32 位字母数字混合（JSON key 上下文）
+  - App ID: cli_ 前缀 + 至少 16 位
+  - 授权码 code: 32~64 位字母数字（一次性使用）
 """
 
 from __future__ import annotations
