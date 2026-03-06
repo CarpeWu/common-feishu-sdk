@@ -103,7 +103,7 @@ class TestBaseServiceBoundary:
         # 模拟 getattr 返回 None
         with patch("ylhp_common_feishu_sdk.services._base.getattr") as mock_getattr:
             mock_getattr.return_value = None
-            with pytest.raises(FeishuAPIError) as exc_info:
+            with pytest.raises(FeishuAPIError):
                 service._check_response(response, "test_operation")
 
     def test_log_call_with_no_params(self) -> None:

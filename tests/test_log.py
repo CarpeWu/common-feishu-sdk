@@ -206,9 +206,12 @@ class TestSensitiveFilterExtended:
             try:
                 for j in range(50):
                     # 使用 20+ 字符的 token 满足新的脱敏规则
-                    record = self._create_record(f"Bearer sk-{i}0o{o:03d}-{j}")
+                    # 格式: sk-{i:03d}padding{j:03d} = sk-000padding000 = 15 chars
+                    # 改为: sk-{i:03d}paddingpadding{j:03d} = 23 chars
+                    token = f"sk-{i:03d}paddingpadding{j:03d}"
+                    record = self._create_record(f"Bearer {token}")
                     flt.filter(record)
-                    assert f"sk-{i:0{03d}-{j:03d}" not in record.msg
+                    assert token not in record.msg
             except Exception as e:
                 errors.append(e)
 
