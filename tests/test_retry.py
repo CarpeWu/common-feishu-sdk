@@ -217,3 +217,120 @@ class TestWithRetry:
             assert mock_logger.warning.called
             warning_call = mock_logger.warning.call_args[0][0]
             assert "重试" in warning_call or "retry" in warning_call.lower()
+
+
+class TestWithRetryBoundary:
+    """测试 with_retry 边界情况。"""
+
+    def test_retry_preserves_function_metadata(self) -> None:
+        """保留原函数 __name__, __doc__。"""
+        assert MockService.success_method.__name__ == "success_method"
+        assert MockService.server_error_method.__name__ == "server_error_method"
+
+    def test_retry_zero_max_retries(self) -> None:
+        """max_retries=0 时不重试（只调用一次）。"""
+        config = FeishuConfig(
+            app_id="test", app_secret="secret", max_retries=0, retry_wait_seconds=0.01
+        )
+        service = MockService(config)
+
+        with pytest.raises(FeishuServerError):
+            service.server_error_method()
+
+        # 只调用一次，不重试
+        assert service.call_count == 1
+
+    def test_retry_zero_wait(self) -> None:
+        """retry_wait_seconds=0 立即重试。"""
+        config = FeishuConfig(
+            app_id="test", app_secret="secret", max_retries=2, retry_wait_seconds=0
+        )
+        service = MockService(config)
+
+        start = time.monotonic()
+        with pytest.raises(FeishuServerError):
+            service.server_error_method()
+        elapsed = time.monotonic() - start
+
+        # 等待时间接近 0
+        assert elapsed < 0.1
+        assert service.call_count == 3
+
+    def test_retry_different_retryable_exceptions(self) -> None:
+        """不同可重试异常 (ServerError vs RateLimitError)。"""
+        config = FeishuConfig(
+            app_id="test", app_secret="secret", max_retries=2, retry_wait_seconds=0.01
+        )
+        service = MockService(config)
+
+        # RateLimitError 也是 retryable=True
+        with pytest.raises(FeishuRateLimitError):
+            service.rate_limit_method(retry_after=0.01)
+
+        assert service.call_count == 3
+
+    def test_retry_preserves_return_type(self) -> None:
+        """返回类型正确。"""
+        config = FeishuConfig(app_id="test", app_secret="secret", max_retries=3)
+        service = MockService(config)
+
+        result = service.success_method()
+        assert isinstance(result, str)
+        assert result == "success"
+
+    def test_concurrent_retry_calls(self) -> None:
+        """并发重试调用独立。"""
+        import concurrent.futures
+
+        config = FeishuConfig(
+            app_id="test", app_secret="secret", max_retries=2, retry_wait_seconds=0.01
+        )
+
+        errors: list[Exception] = []
+        results: list[str] = []
+
+        def call_success() -> None:
+            try:
+                service = MockService(config)
+                result = service.eventually_succeed_method(succeed_on_attempt=1)
+                results.append(result)
+            except Exception as e:
+                errors.append(e)
+
+        def call_server_error() -> None:
+            try:
+                service = MockService(config)
+                service.server_error_method()
+            except FeishuServerError:
+                pass  # Expected
+            except Exception as e:
+                errors.append(e)
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=10):
+            futures = []
+            for _ in range(5):
+                futures.append(concurrent.futures.ThreadPoolExecutor(max_workers=1).submit(call_success))
+            for _ in range(5):
+                futures.append(concurrent.futures.ThreadPoolExecutor(max_workers=1).submit(call_server_error))
+
+        assert len(errors) == 0
+        assert len(results) == 5
+
+    def test_eventually_succeed_different_attempts(self) -> None:
+        """不同尝试次数后成功。"""
+        config = FeishuConfig(
+            app_id="test", app_secret="secret", max_retries=5, retry_wait_seconds=0.01
+        )
+        service = MockService(config)
+
+        # 第 3 次成功
+        result = service.eventually_succeed_method(succeed_on_attempt=3)
+        assert result == "eventual_success"
+        assert service.call_count == 3
+
+        # 重置
+        service2 = MockService(config)
+        # 第 5 次成功
+        result2 = service2.eventually_succeed_method(succeed_on_attempt=5)
+        assert result2 == "eventual_success"
+        assert service2.call_count == 5

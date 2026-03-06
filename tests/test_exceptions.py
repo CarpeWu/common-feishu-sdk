@@ -145,3 +145,65 @@ class TestUnknownCodeWarning:
             assert isinstance(err, FeishuAPIError)
         finally:
             sdk_logger.propagate = original_propagate
+
+
+class TestExceptionBoundary:
+    """测试异常边界情况。"""
+
+    def test_translate_with_none_log_id(self) -> None:
+        """log_id=None 时消息格式正确。"""
+        err = translate_error(99991660, "auth error", None)
+        assert isinstance(err, FeishuAuthError)
+        assert err.log_id is None
+        msg = str(err)
+        assert "log_id=None" in msg
+
+    def test_translate_with_chinese_message(self) -> None:
+        """中文错误消息正确处理。"""
+        err = translate_error(99991500, "服务器内部错误", "log_cn")
+        assert isinstance(err, FeishuServerError)
+        assert err.msg == "服务器内部错误"
+
+    def test_translate_empty_response(self) -> None:
+        """code/msg 为空时的降级处理。"""
+        # msg 为空
+        err = translate_error(12345, "", "log_empty")
+        assert isinstance(err, FeishuAPIError)
+        assert err.msg == ""
+
+        # msg 为 None (传入空字符串会被转为 "")
+        err2 = translate_error(99999, "", None)
+        assert isinstance(err2, FeishuAPIError)
+
+    def test_feishu_error_str(self) -> None:
+        """__str__ 方法返回完整信息。"""
+        err = FeishuAPIError(10001, "test error message", "log_str")
+        msg = str(err)
+        assert "10001" in msg
+        assert "test error message" in msg
+        assert "log_str" in msg
+
+    def test_feishu_error_repr(self) -> None:
+        """__repr__ 方法返回可解析格式。"""
+        err = FeishuAPIError(10001, "test", "log_repr")
+        repr_str = repr(err)
+        assert "FeishuAPIError" in repr_str
+
+    def test_concurrent_translate(self) -> None:
+        """并发调用 translate_error 线程安全。"""
+        import concurrent.futures
+
+        errors: list[Exception] = []
+
+        def translate_many(i: int) -> None:
+            try:
+                for j in range(100):
+                    err = translate_error(99991660, f"error_{i}_{j}", f"log_{i}_{j}")
+                    assert isinstance(err, FeishuAuthError)
+            except Exception as e:
+                errors.append(e)
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=10):
+            list(concurrent.futures.ThreadPoolExecutor(max_workers=10).map(translate_many, range(10)))
+
+        assert len(errors) == 0

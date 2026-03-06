@@ -160,3 +160,107 @@ class TestFeishuProperties:
         config = FeishuConfig(app_id="cli_repr", app_secret="secret")
         feishu = Feishu(config=config)
         assert "cli_repr" in repr(feishu)
+
+    def test_lark_client_property(self) -> None:
+        """lark_client 属性返回底层 lark-oapi 客户端。"""
+        config = FeishuConfig(app_id="cli_lark", app_secret="lark_secret")
+        feishu = Feishu(config=config)
+
+        # lark_client 应该是一个有效的 lark.Client 实例
+        client = feishu.lark_client
+        assert client is not None
+        # 验证是同一个实例（每次访问返回同一个对象）
+        assert feishu.lark_client is client
+
+
+class TestFeishuBoundary:
+    """测试 Feishu 边界情况。"""
+
+    def test_client_with_custom_domain(self) -> None:
+        """自定义 domain（私有化部署）。"""
+        config = FeishuConfig(
+            app_id="cli_domain",
+            app_secret="secret",
+            domain="https://open.feishu.cn",
+        )
+        feishu = Feishu(config=config)
+        assert feishu.config.domain == "https://open.feishu.cn"
+
+    def test_client_with_custom_timeout(self) -> None:
+        """自定义 timeout。"""
+        config = FeishuConfig(
+            app_id="cli_timeout",
+            app_secret="secret",
+            timeout=30,
+        )
+        feishu = Feishu(config=config)
+        assert feishu.config.timeout == 30
+
+    def test_client_with_max_retries(self) -> None:
+        """自定义 max_retries。"""
+        config = FeishuConfig(
+            app_id="cli_retries",
+            app_secret="secret",
+            max_retries=5,
+        )
+        feishu = Feishu(config=config)
+        assert feishu.config.max_retries == 5
+
+    def test_concurrent_get_registered(self) -> None:
+        """并发获取已注册实例。"""
+        config = FeishuConfig(app_id="cli_concurrent_get", app_secret="secret")
+        Feishu.register("concurrent_test", config)
+
+        results: list[Feishu] = []
+        errors: list[Exception] = []
+
+        def get_instance() -> None:
+            try:
+                for _ in range(100):
+                    feishu = Feishu.get("concurrent_test")
+                    results.append(feishu)
+            except Exception as e:
+                errors.append(e)
+
+        threads = [threading.Thread(target=get_instance) for _ in range(10)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        assert len(errors) == 0
+        assert len(results) == 1000
+        # 所有获取的实例应该是同一个对象
+        assert all(r is results[0] for r in results)
+
+    def test_config_is_readonly(self) -> None:
+        """config 属性是只读的（frozen）。"""
+        config = FeishuConfig(app_id="cli_readonly", app_secret="secret")
+        feishu = Feishu(config=config)
+        # config 本身是 frozen 的
+        with pytest.raises((AttributeError, TypeError)):
+            feishu.config.app_id = "new_id"  # type: ignore[misc]
+
+    def test_register_empty_name(self) -> None:
+        """注册空名称。"""
+        config = FeishuConfig(app_id="cli_empty_name", app_secret="secret")
+        # 空字符串名称应该被允许（虽然不推荐）
+        feishu = Feishu.register("", config)
+        assert Feishu.get("") is feishu
+        Feishu.remove("")
+
+    def test_registered_names_returns_copy(self) -> None:
+        """registered_names 返回副本，修改不影响原注册表。"""
+        config = FeishuConfig(app_id="cli_names_copy", app_secret="secret")
+        Feishu.register("names_copy_test", config)
+        names = Feishu.registered_names()
+        names.clear()  # 修改返回的列表
+        # 原注册表不受影响
+        assert "names_copy_test" in Feishu.registered_names()
+
+    def test_repr_format(self) -> None:
+        """__repr__ 格式正确。"""
+        config = FeishuConfig(app_id="cli_repr_test", app_secret="secret")
+        feishu = Feishu(config=config)
+        repr_str = repr(feishu)
+        assert repr_str == "Feishu(app_id='cli_repr_test')"
