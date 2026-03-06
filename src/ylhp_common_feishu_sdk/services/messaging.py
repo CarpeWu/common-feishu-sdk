@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 from typing import Any
 
 from lark_oapi.api.im.v1 import (
@@ -11,9 +10,16 @@ from lark_oapi.api.im.v1 import (
     ReplyMessageRequest,
     ReplyMessageRequestBody,
 )
+from pydantic import ValidationError
 
 from ylhp_common_feishu_sdk._retry import with_retry
 from ylhp_common_feishu_sdk.exceptions import FeishuValidationError
+from ylhp_common_feishu_sdk.models import (
+    CardContent,
+    ReplyTextRequest,
+    SendMessageRequest,
+    TextContent,
+)
 from ylhp_common_feishu_sdk.services._base import BaseService
 
 
@@ -33,23 +39,6 @@ class MessagingService(BaseService):
         >>> msg_id = feishu.messages.send_text("ou_xxx", "Hello World")
         >>> feishu.messages.reply_text(msg_id, "Reply content")
     """
-
-    def _validate_non_empty(self, value: str, field_name: str) -> str:
-        """校验字符串非空。
-
-        Args:
-            value: 待校验的字符串
-            field_name: 字段名（用于错误消息）
-
-        Returns:
-            去除首尾空格后的字符串
-
-        Raises:
-            FeishuValidationError: 字符串为空或仅包含空白字符
-        """
-        if not value or not value.strip():
-            raise FeishuValidationError(field_name, f"{field_name} 不能为空")
-        return value.strip()
 
     def _send_message(
         self,
@@ -114,11 +103,22 @@ class MessagingService(BaseService):
         Example:
             >>> msg_id = feishu.messages.send_text("ou_xxx", "Hello World")
         """
-        open_id = self._validate_non_empty(open_id, "open_id")
-        text = self._validate_non_empty(text, "text")
+        try:
+            # 使用 Pydantic 模型校验
+            text_content = TextContent(text=text)
+            _ = SendMessageRequest(
+                receive_id=open_id,
+                msg_type="text",
+                content=text_content.to_json(),
+            )
+        except ValidationError as e:
+            # 提取第一个错误字段
+            error = e.errors()[0]
+            field_name = error.get("loc", ("unknown",))[0]
+            message = error.get("msg", "参数校验失败")
+            raise FeishuValidationError(str(field_name), message) from e
 
-        content = json.dumps({"text": text}, ensure_ascii=False)
-        return self._send_message(open_id, "text", content, "open_id", "send_text")
+        return self._send_message(open_id, "text", text_content.to_json(), "open_id", "send_text")
 
     @with_retry
     def send_text_to_chat(self, chat_id: str, text: str) -> str:
@@ -140,11 +140,23 @@ class MessagingService(BaseService):
         Example:
             >>> msg_id = feishu.messages.send_text_to_chat("oc_xxx", "Hello Group")
         """
-        chat_id = self._validate_non_empty(chat_id, "chat_id")
-        text = self._validate_non_empty(text, "text")
+        try:
+            # 使用 Pydantic 模型校验
+            text_content = TextContent(text=text)
+            _ = SendMessageRequest(
+                receive_id=chat_id,
+                msg_type="text",
+                content=text_content.to_json(),
+            )
+        except ValidationError as e:
+            error = e.errors()[0]
+            field_name = error.get("loc", ("unknown",))[0]
+            message = error.get("msg", "参数校验失败")
+            raise FeishuValidationError(str(field_name), message) from e
 
-        content = json.dumps({"text": text}, ensure_ascii=False)
-        return self._send_message(chat_id, "text", content, "chat_id", "send_text_to_chat")
+        return self._send_message(
+            chat_id, "text", text_content.to_json(), "chat_id", "send_text_to_chat"
+        )
 
     @with_retry
     def send_card(
@@ -173,12 +185,27 @@ class MessagingService(BaseService):
             >>> card = {"elements": [{"tag": "div", "text": {"content": "Hello"}}]}
             >>> msg_id = feishu.messages.send_card("ou_xxx", card)
         """
-        receive_id = self._validate_non_empty(receive_id, "receive_id")
-        if not card:
-            raise FeishuValidationError("card", "卡片内容不能为空")
+        try:
+            # 使用 Pydantic 模型校验
+            card_content = CardContent(card=card)
+            _ = SendMessageRequest(
+                receive_id=receive_id,
+                msg_type="interactive",
+                content=card_content.to_json(),
+            )
+        except ValidationError as e:
+            error = e.errors()[0]
+            field_name = error.get("loc", ("unknown",))[0]
+            message = error.get("msg", "参数校验失败")
+            raise FeishuValidationError(str(field_name), message) from e
 
-        content = json.dumps(card, ensure_ascii=False)
-        return self._send_message(receive_id, "interactive", content, receive_id_type, "send_card")
+        return self._send_message(
+            receive_id,
+            "interactive",
+            card_content.to_json(),
+            receive_id_type,
+            "send_card",
+        )
 
     @with_retry
     def reply_text(self, message_id: str, text: str) -> str:
@@ -200,17 +227,25 @@ class MessagingService(BaseService):
         Example:
             >>> reply_id = feishu.messages.reply_text("om_xxx", "Reply content")
         """
-        message_id = self._validate_non_empty(message_id, "message_id")
-        text = self._validate_non_empty(text, "text")
+        try:
+            # 使用 Pydantic 模型校验
+            reply_request = ReplyTextRequest(message_id=message_id, text=text)
+        except ValidationError as e:
+            error = e.errors()[0]
+            field_name = error.get("loc", ("unknown",))[0]
+            message = error.get("msg", "参数校验失败")
+            raise FeishuValidationError(str(field_name), message) from e
 
-        self._log_call("reply_text", message_id=message_id)
+        self._log_call("reply_text", message_id=reply_request.message_id)
 
-        content = json.dumps({"text": text}, ensure_ascii=False)
         req = (
             ReplyMessageRequest.builder()
-            .message_id(message_id)
+            .message_id(reply_request.message_id)
             .request_body(
-                ReplyMessageRequestBody.builder().msg_type("text").content(content).build()
+                ReplyMessageRequestBody.builder()
+                .msg_type("text")
+                .content(reply_request.to_content_json())
+                .build()
             )
             .build()
         )

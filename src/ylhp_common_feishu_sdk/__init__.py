@@ -20,7 +20,18 @@ from ylhp_common_feishu_sdk.exceptions import (
     translate_error,
 )
 from ylhp_common_feishu_sdk.log import SensitiveFilter, setup_sdk_logger
-from ylhp_common_feishu_sdk.models import PageResult
+from ylhp_common_feishu_sdk.models import (
+    AuthCodeRequest,
+    AuthorizeUrlParams,
+    CardContent,
+    Department,
+    PageResult,
+    ReplyTextRequest,
+    SendMessageRequest,
+    TextContent,
+    UserDetail,
+    UserInfo,
+)
 
 __all__ = [
     "__version__",
@@ -42,4 +53,14 @@ __all__ = [
     "setup_sdk_logger",
     # Models
     "PageResult",
+    "UserInfo",
+    "Department",
+    "UserDetail",
+    "AuthorizeUrlParams",
+    "AuthCodeRequest",
+    # Messaging Models
+    "TextContent",
+    "CardContent",
+    "SendMessageRequest",
+    "ReplyTextRequest",
 ]
