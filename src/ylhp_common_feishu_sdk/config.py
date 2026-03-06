@@ -72,12 +72,16 @@ class FeishuConfig:
         _set(
             self,
             "max_retries",
-            self.max_retries if self.max_retries is not None else int(os.getenv("FEISHU_MAX_RETRIES", "3")),
+            self.max_retries
+            if self.max_retries is not None
+            else int(os.getenv("FEISHU_MAX_RETRIES", "3")),
         )
         _set(
             self,
             "retry_wait_seconds",
-            self.retry_wait_seconds if self.retry_wait_seconds is not None else float(os.getenv("FEISHU_RETRY_WAIT_SECONDS", "1.0")),
+            self.retry_wait_seconds
+            if self.retry_wait_seconds is not None
+            else float(os.getenv("FEISHU_RETRY_WAIT_SECONDS", "1.0")),
         )
 
         # 校验必填字段

@@ -204,6 +204,8 @@ class TestExceptionBoundary:
                 errors.append(e)
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=10):
-            list(concurrent.futures.ThreadPoolExecutor(max_workers=10).map(translate_many, range(10)))
+            list(
+                concurrent.futures.ThreadPoolExecutor(max_workers=10).map(translate_many, range(10))
+            )
 
         assert len(errors) == 0
