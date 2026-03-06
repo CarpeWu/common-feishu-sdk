@@ -144,7 +144,9 @@ class TestSensitiveFilterExtended:
     def test_sanitize_nested_json(self) -> None:
         """JSON 字符串中的敏感信息。"""
         flt = SensitiveFilter()
-        record = self._create_record('{"token": "Bearer sk-json123abc456def789ghi", "secret": "abc"}')
+        record = self._create_record(
+            '{"token": "Bearer sk-json123abc456def789ghi", "secret": "abc"}'
+        )
         flt.filter(record)
         assert "sk-json123abc456def789ghi" not in record.msg
 
@@ -216,7 +218,9 @@ class TestSensitiveFilterExtended:
                 errors.append(e)
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=10):
-            list(concurrent.futures.ThreadPoolExecutor(max_workers=10).map(log_sensitive, range(10)))
+            list(
+                concurrent.futures.ThreadPoolExecutor(max_workers=10).map(log_sensitive, range(10))
+            )
 
         assert len(errors) == 0
 

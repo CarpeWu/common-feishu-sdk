@@ -309,9 +309,13 @@ class TestWithRetryBoundary:
         with concurrent.futures.ThreadPoolExecutor(max_workers=10):
             futures = []
             for _ in range(5):
-                futures.append(concurrent.futures.ThreadPoolExecutor(max_workers=1).submit(call_success))
+                futures.append(
+                    concurrent.futures.ThreadPoolExecutor(max_workers=1).submit(call_success)
+                )
             for _ in range(5):
-                futures.append(concurrent.futures.ThreadPoolExecutor(max_workers=1).submit(call_server_error))
+                futures.append(
+                    concurrent.futures.ThreadPoolExecutor(max_workers=1).submit(call_server_error)
+                )
 
         assert len(errors) == 0
         assert len(results) == 5

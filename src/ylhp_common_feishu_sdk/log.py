@@ -48,13 +48,10 @@ class SensitiveFilter(logging.Filter):
     _PATTERNS: list[tuple[re.Pattern[str], str | Callable[[re.Match[str]], str]]] = [
         # 1. JWT 格式 token (user_access_token, refresh_token)
         (re.compile(r"\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+"), "eyJ***"),
-
         # 2. tenant_access_token (t-前缀 + 至少20字符)
         (re.compile(r"\bt-[A-Za-z0-9_-]{20,}\b"), "t-***"),
-
         # 3. app_access_token (a-前缀 + 至少20字符)
         (re.compile(r"\ba-[A-Za-z0-9_-]{20,}\b"), "a-***"),
-
         # 4. App Secret (限定 JSON key 上下文)
         # 匹配: "app_secret": / "client_secret": / "secret": / "app_Secret":
         (
@@ -64,20 +61,16 @@ class SensitiveFilter(logging.Filter):
             ),
             r"\1***\3",
         ),
-
         # 5. App ID (cli_前缀 + 至少16位)
         # 保留前8位用于调试: cli_a879***
         (
             re.compile(r"\bcli_[a-z0-9]{16,}\b"),
             lambda m: f"{m.group()[:8]}***",
         ),
-
         # 6. URL 中的授权码 code 参数
         (re.compile(r"([?&]code=)[A-Za-z0-9_-]{16,}"), r"\1***"),
-
         # 7. JSON code 字段 (字符串值，数字 code 不匹配)
         (re.compile(r'("code"\s*:\s*")([A-Za-z0-9_-]{16,})(")'), r"\1***\3"),
-
         # 8. Bearer Authorization Header (兜底)
         (re.compile(r"(Bearer\s+)\S{20,}", re.IGNORECASE), r"\1***"),
     ]
