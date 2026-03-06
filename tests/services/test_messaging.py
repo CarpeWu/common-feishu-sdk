@@ -90,7 +90,8 @@ def test_send_text_empty_open_id(feishu):
     with pytest.raises(FeishuValidationError) as exc_info:
         feishu.messages.send_text("", "Hello")
 
-    assert exc_info.value.field == "open_id"
+    # 使用 SendMessageRequest 模型校验，字段名为 receive_id
+    assert exc_info.value.field == "receive_id"
 
 
 # === send_text_to_chat 测试 ===

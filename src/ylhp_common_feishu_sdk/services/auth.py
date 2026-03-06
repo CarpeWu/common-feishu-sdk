@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field
 from urllib.parse import quote_plus
 
 import lark_oapi as lark
@@ -12,54 +11,13 @@ from lark_oapi.api.authen.v1 import (
     CreateOidcAccessTokenRequestBody,
     GetUserInfoRequest,
 )
-from pydantic import BaseModel, field_validator
 
 from ylhp_common_feishu_sdk._retry import with_retry
 from ylhp_common_feishu_sdk.exceptions import FeishuValidationError
+from ylhp_common_feishu_sdk.models import AuthCodeRequest, AuthorizeUrlParams, UserInfo
 from ylhp_common_feishu_sdk.services._base import BaseService
 
 logger = logging.getLogger("ylhp_common_feishu_sdk")
-
-
-@dataclass(frozen=True)
-class UserInfo:
-    """用户基本信息（H5 登录返回）。"""
-
-    open_id: str
-    name: str
-    en_name: str | None = None
-    avatar_url: str | None = None
-    email: str | None = None
-    mobile: str | None = None
-    tenant_key: str | None = None
-    department_ids: list[str] = field(default_factory=list)
-
-
-class AuthorizeUrlParams(BaseModel):
-    """构建授权 URL 的参数。"""
-
-    redirect_uri: str
-    state: str = ""
-
-    @field_validator("redirect_uri")
-    @classmethod
-    def validate_redirect_uri(cls, v: str) -> str:
-        if not v.startswith(("http://", "https://")):
-            raise ValueError("必须以 http:// 或 https:// 开头")
-        return v
-
-
-class AuthCodeRequest(BaseModel):
-    """授权码请求参数。"""
-
-    code: str
-
-    @field_validator("code")
-    @classmethod
-    def validate_code(cls, v: str) -> str:
-        if not v or not v.strip():
-            raise ValueError("授权码不能为空")
-        return v.strip()
 
 
 class AuthService(BaseService):

@@ -24,7 +24,6 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
-from dataclasses import dataclass, field
 
 from lark_oapi.api.contact.v3 import (
     ChildrenDepartmentRequest,
@@ -34,88 +33,8 @@ from lark_oapi.api.contact.v3 import (
 
 from ylhp_common_feishu_sdk._retry import with_retry
 from ylhp_common_feishu_sdk.exceptions import FeishuValidationError
-from ylhp_common_feishu_sdk.models import PageResult
+from ylhp_common_feishu_sdk.models import Department, PageResult, UserDetail, UserInfo
 from ylhp_common_feishu_sdk.services._base import BaseService
-
-# ─── 数据模型 ───
-
-
-@dataclass(frozen=True)
-class Department:
-    """部门信息。
-
-    Attributes:
-        department_id: 部门 ID
-        open_department_id: 部门的 open_department_id
-        name: 部门名称
-        parent_department_id: 父部门 ID
-        leader_user_id: 部门主管的用户 ID
-        member_count: 部门成员数量
-    """
-
-    department_id: str
-    open_department_id: str
-    name: str
-    parent_department_id: str | None = None
-    leader_user_id: str | None = None
-    member_count: int | None = None
-
-
-@dataclass(frozen=True)
-class UserInfo:
-    """用户基本信息（部门员工列表条目）。
-
-    Attributes:
-        open_id: 用户的 open_id
-        name: 用户姓名
-        en_name: 英文名
-        avatar_url: 头像 URL
-        email: 邮箱
-        mobile: 手机号
-        tenant_key: 租户 key
-        department_ids: 所属部门 ID 列表
-    """
-
-    open_id: str
-    name: str
-    en_name: str | None = None
-    avatar_url: str | None = None
-    email: str | None = None
-    mobile: str | None = None
-    tenant_key: str | None = None
-    department_ids: list[str] = field(default_factory=list)
-
-
-@dataclass(frozen=True)
-class UserDetail:
-    """用户详细信息（get_user 返回）。
-
-    Attributes:
-        open_id: 用户的 open_id
-        name: 用户姓名
-        en_name: 英文名
-        avatar_url: 头像 URL
-        email: 邮箱
-        mobile: 手机号
-        department_ids: 所属部门 ID 列表
-        job_title: 职位
-        is_activated: 是否已激活
-        is_frozen: 是否已冻结
-        is_resigned: 是否已离职
-    """
-
-    open_id: str
-    name: str
-    en_name: str | None = None
-    avatar_url: str | None = None
-    email: str | None = None
-    mobile: str | None = None
-    department_ids: list[str] = field(default_factory=list)
-    job_title: str | None = None
-    is_activated: bool | None = None
-    is_frozen: bool | None = None
-    is_resigned: bool | None = None
-
 
 # ─── ContactService ───
 
