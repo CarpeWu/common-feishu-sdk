@@ -1,2 +1,221 @@
-# TODO: 实现 Messaging 服务
-# 参考: docs/ylhp-common-feishu-sdk 需求与架构设计文档.md 3.8 节
+"""消息发送服务。"""
+
+from __future__ import annotations
+
+import json
+from typing import Any
+
+from lark_oapi.api.im.v1 import (
+    CreateMessageRequest,
+    CreateMessageRequestBody,
+    ReplyMessageRequest,
+    ReplyMessageRequestBody,
+)
+
+from ylhp_common_feishu_sdk._retry import with_retry
+from ylhp_common_feishu_sdk.exceptions import FeishuValidationError
+from ylhp_common_feishu_sdk.services._base import BaseService
+
+
+class MessagingService(BaseService):
+    """消息发送服务。
+
+    提供飞书 IM 消息发送能力，包括：
+    - 发送个人文本消息（通过 open_id）
+    - 发送群聊文本消息（通过 chat_id）
+    - 发送交互式卡片消息
+    - 回复指定消息
+
+    所有发送方法都使用 @with_retry 装饰器，对 5xx 和 429 错误自动重试。
+
+    Example:
+        >>> feishu = Feishu(app_id="xxx", app_secret="yyy")
+        >>> msg_id = feishu.messages.send_text("ou_xxx", "Hello World")
+        >>> feishu.messages.reply_text(msg_id, "Reply content")
+    """
+
+    def _validate_non_empty(self, value: str, field_name: str) -> str:
+        """校验字符串非空。
+
+        Args:
+            value: 待校验的字符串
+            field_name: 字段名（用于错误消息）
+
+        Returns:
+            去除首尾空格后的字符串
+
+        Raises:
+            FeishuValidationError: 字符串为空或仅包含空白字符
+        """
+        if not value or not value.strip():
+            raise FeishuValidationError(field_name, f"{field_name} 不能为空")
+        return value.strip()
+
+    def _send_message(
+        self,
+        receive_id: str,
+        msg_type: str,
+        content: str,
+        receive_id_type: str,
+        operation: str,
+    ) -> str:
+        """内部通用消息发送方法。
+
+        Args:
+            receive_id: 接收者 ID（open_id / chat_id / user_id 等）
+            msg_type: 消息类型（text / interactive / image 等）
+            content: 消息内容（JSON 字符串）
+            receive_id_type: 接收者 ID 类型
+            operation: 操作名称（用于日志）
+
+        Returns:
+            消息 ID
+
+        Raises:
+            FeishuAPIError: API 调用失败
+        """
+        self._log_call(operation, receive_id=receive_id, msg_type=msg_type)
+
+        req = (
+            CreateMessageRequest.builder()
+            .receive_id_type(receive_id_type)
+            .request_body(
+                CreateMessageRequestBody.builder()
+                .receive_id(receive_id)
+                .msg_type(msg_type)
+                .content(content)
+                .build()
+            )
+            .build()
+        )
+
+        resp = self._client.im.v1.message.create(req)
+        self._check_response(resp, operation)
+
+        return resp.data.message_id
+
+    @with_retry
+    def send_text(self, open_id: str, text: str) -> str:
+        """发送个人文本消息（通过 open_id）。
+
+        Args:
+            open_id: 接收者的 open_id
+            text: 文本消息内容
+
+        Returns:
+            消息 ID
+
+        Raises:
+            FeishuValidationError: open_id 或 text 为空
+            FeishuAuthError: 认证失败（不重试）
+            FeishuServerError: 服务端错误（自动重试）
+            FeishuRateLimitError: 限流错误（自动重试）
+
+        Example:
+            >>> msg_id = feishu.messages.send_text("ou_xxx", "Hello World")
+        """
+        open_id = self._validate_non_empty(open_id, "open_id")
+        text = self._validate_non_empty(text, "text")
+
+        content = json.dumps({"text": text}, ensure_ascii=False)
+        return self._send_message(open_id, "text", content, "open_id", "send_text")
+
+    @with_retry
+    def send_text_to_chat(self, chat_id: str, text: str) -> str:
+        """发送群聊文本消息（通过 chat_id）。
+
+        Args:
+            chat_id: 群聊的 chat_id
+            text: 文本消息内容
+
+        Returns:
+            消息 ID
+
+        Raises:
+            FeishuValidationError: chat_id 或 text 为空
+            FeishuAuthError: 认证失败（不重试）
+            FeishuServerError: 服务端错误（自动重试）
+            FeishuRateLimitError: 限流错误（自动重试）
+
+        Example:
+            >>> msg_id = feishu.messages.send_text_to_chat("oc_xxx", "Hello Group")
+        """
+        chat_id = self._validate_non_empty(chat_id, "chat_id")
+        text = self._validate_non_empty(text, "text")
+
+        content = json.dumps({"text": text}, ensure_ascii=False)
+        return self._send_message(chat_id, "text", content, "chat_id", "send_text_to_chat")
+
+    @with_retry
+    def send_card(
+        self,
+        receive_id: str,
+        card: dict[str, Any],
+        receive_id_type: str = "open_id",
+    ) -> str:
+        """发送交互式卡片消息。
+
+        Args:
+            receive_id: 接收者 ID
+            card: 卡片内容（字典格式，遵循飞书卡片消息协议）
+            receive_id_type: 接收者 ID 类型，默认 "open_id"
+
+        Returns:
+            消息 ID
+
+        Raises:
+            FeishuValidationError: receive_id 为空或 card 为空字典
+            FeishuAuthError: 认证失败（不重试）
+            FeishuServerError: 服务端错误（自动重试）
+            FeishuRateLimitError: 限流错误（自动重试）
+
+        Example:
+            >>> card = {"elements": [{"tag": "div", "text": {"content": "Hello"}}]}
+            >>> msg_id = feishu.messages.send_card("ou_xxx", card)
+        """
+        receive_id = self._validate_non_empty(receive_id, "receive_id")
+        if not card:
+            raise FeishuValidationError("card", "卡片内容不能为空")
+
+        content = json.dumps(card, ensure_ascii=False)
+        return self._send_message(receive_id, "interactive", content, receive_id_type, "send_card")
+
+    @with_retry
+    def reply_text(self, message_id: str, text: str) -> str:
+        """回复指定消息。
+
+        Args:
+            message_id: 被回复消息的 ID
+            text: 回复的文本内容
+
+        Returns:
+            回复消息的 ID
+
+        Raises:
+            FeishuValidationError: message_id 或 text 为空
+            FeishuAuthError: 认证失败（不重试）
+            FeishuServerError: 服务端错误（自动重试）
+            FeishuRateLimitError: 限流错误（自动重试）
+
+        Example:
+            >>> reply_id = feishu.messages.reply_text("om_xxx", "Reply content")
+        """
+        message_id = self._validate_non_empty(message_id, "message_id")
+        text = self._validate_non_empty(text, "text")
+
+        self._log_call("reply_text", message_id=message_id)
+
+        content = json.dumps({"text": text}, ensure_ascii=False)
+        req = (
+            ReplyMessageRequest.builder()
+            .message_id(message_id)
+            .request_body(
+                ReplyMessageRequestBody.builder().msg_type("text").content(content).build()
+            )
+            .build()
+        )
+
+        resp = self._client.im.v1.message.reply(req)
+        self._check_response(resp, "reply_text")
+
+        return resp.data.message_id
