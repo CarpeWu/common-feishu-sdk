@@ -131,3 +131,86 @@ class TestFeishuConfigImmutable:
         config = FeishuConfig(app_id="test", app_secret="secret")
         with pytest.raises((AttributeError, TypeError)):
             config.log_level = "DEBUG"  # type: ignore[misc]
+
+
+class TestFeishuConfigBoundary:
+    """测试配置边界情况。"""
+
+    def test_config_timeout_range(self) -> None:
+        """timeout 边界值。"""
+        # timeout=1 是最小有效值
+        config = FeishuConfig(app_id="test", app_secret="secret", timeout=1)
+        assert config.timeout == 1
+
+        # 大值
+        config2 = FeishuConfig(app_id="test", app_secret="secret", timeout=300)
+        assert config2.timeout == 300
+
+    def test_config_max_retries_range(self) -> None:
+        """max_retries 边界值。"""
+        # max_retries=1 是最小有效值
+        config = FeishuConfig(app_id="test", app_secret="secret", max_retries=1)
+        assert config.max_retries == 1
+
+        config2 = FeishuConfig(app_id="test", app_secret="secret", max_retries=10)
+        assert config2.max_retries == 10
+
+    def test_config_log_level_case_insensitive(self) -> None:
+        """log_level 大小写不敏感。"""
+        config1 = FeishuConfig(app_id="test", app_secret="secret", log_level="debug")
+        assert config1.log_level == "DEBUG"
+
+        config2 = FeishuConfig(app_id="test", app_secret="secret", log_level="Warning")
+        assert config2.log_level == "WARNING"
+
+    def test_config_equality(self) -> None:
+        """相同值的配置相等。"""
+        config1 = FeishuConfig(app_id="test", app_secret="secret")
+        config2 = FeishuConfig(app_id="test", app_secret="secret")
+        assert config1 == config2
+
+    def test_config_inequality(self) -> None:
+        """不同值的配置不相等。"""
+        config1 = FeishuConfig(app_id="test1", app_secret="secret")
+        config2 = FeishuConfig(app_id="test2", app_secret="secret")
+        assert config1 != config2
+
+    def test_config_hash(self) -> None:
+        """相同值的配置 hash 相同。"""
+        config1 = FeishuConfig(app_id="test", app_secret="secret")
+        config2 = FeishuConfig(app_id="test", app_secret="secret")
+        assert hash(config1) == hash(config2)
+
+    def test_concurrent_config_creation(self) -> None:
+        """并发创建配置对象。"""
+        import concurrent.futures
+
+        errors: list[Exception] = []
+
+        def create_config(i: int) -> None:
+            try:
+                for _ in range(100):
+                    config = FeishuConfig(app_id=f"app_{i}", app_secret=f"secret_{i}")
+                    assert config.app_id == f"app_{i}"
+            except Exception as e:
+                errors.append(e)
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=10):
+            list(concurrent.futures.ThreadPoolExecutor(max_workers=10).map(create_config, range(10)))
+
+        assert len(errors) == 0
+
+    def test_config_timeout_zero(self) -> None:
+        """timeout=0 应该被保留。"""
+        config = FeishuConfig(app_id="test", app_secret="secret", timeout=0)
+        assert config.timeout == 0
+
+    def test_config_max_retries_zero(self) -> None:
+        """max_retries=0 应该被保留（禁用重试）。"""
+        config = FeishuConfig(app_id="test", app_secret="secret", max_retries=0)
+        assert config.max_retries == 0
+
+    def test_config_retry_wait_seconds_zero(self) -> None:
+        """retry_wait_seconds=0 应该被保留。"""
+        config = FeishuConfig(app_id="test", app_secret="secret", retry_wait_seconds=0)
+        assert config.retry_wait_seconds == 0.0

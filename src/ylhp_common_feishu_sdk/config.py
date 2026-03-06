@@ -38,9 +38,9 @@ class FeishuConfig:
     app_secret: str = ""
     domain: str = ""
     log_level: str = ""
-    timeout: int = 0
-    max_retries: int = 0
-    retry_wait_seconds: float = 0.0
+    timeout: int | None = None
+    max_retries: int | None = None
+    retry_wait_seconds: float | None = None
 
     def __post_init__(self) -> None:
         """初始化后处理：加载环境变量并校验。"""
@@ -67,17 +67,17 @@ class FeishuConfig:
         _set(
             self,
             "timeout",
-            self.timeout or int(os.getenv("FEISHU_TIMEOUT", "10")),
+            self.timeout if self.timeout is not None else int(os.getenv("FEISHU_TIMEOUT", "10")),
         )
         _set(
             self,
             "max_retries",
-            self.max_retries or int(os.getenv("FEISHU_MAX_RETRIES", "3")),
+            self.max_retries if self.max_retries is not None else int(os.getenv("FEISHU_MAX_RETRIES", "3")),
         )
         _set(
             self,
             "retry_wait_seconds",
-            self.retry_wait_seconds or float(os.getenv("FEISHU_RETRY_WAIT_SECONDS", "1.0")),
+            self.retry_wait_seconds if self.retry_wait_seconds is not None else float(os.getenv("FEISHU_RETRY_WAIT_SECONDS", "1.0")),
         )
 
         # 校验必填字段
