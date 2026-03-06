@@ -478,9 +478,9 @@ class FeishuConfig:
     app_secret: str = field(default="")
     domain: str = field(default="")
     log_level: str = field(default="")
-    timeout: int = field(default=0)
-    max_retries: int = field(default=0)
-    retry_wait_seconds: float = field(default=0.0)
+    timeout: int | None = field(default=None)
+    max_retries: int | None = field(default=None)
+    retry_wait_seconds: float | None = field(default=None)
 
     def __post_init__(self) -> None:
         # frozen=True 下修改字段需要用 object.__setattr__
@@ -501,18 +501,18 @@ class FeishuConfig:
         _set(
             self,
             "timeout",
-            self.timeout or int(os.getenv("FEISHU_TIMEOUT", "10")),
+            self.timeout if self.timeout is not None else int(os.getenv("FEISHU_TIMEOUT", "10")),
         )
         _set(
             self,
             "max_retries",
-            self.max_retries or int(os.getenv("FEISHU_MAX_RETRIES", "3")),
+            self.max_retries if self.max_retries is not None else int(os.getenv("FEISHU_MAX_RETRIES", "3")),
         )
         _set(
             self,
             "retry_wait_seconds",
-            self.retry_wait_seconds
-            or float(os.getenv("FEISHU_RETRY_WAIT_SECONDS", "1.0")),
+            self.retry_wait_seconds if self.retry_wait_seconds is not None
+            else float(os.getenv("FEISHU_RETRY_WAIT_SECONDS", "1.0")),
         )
 
         # 校验
@@ -736,30 +736,99 @@ from __future__ import annotations
 
 import logging
 import re
+from collections.abc import Callable
+from typing import Any
 
 
 class SensitiveFilter(logging.Filter):
     """日志脱敏过滤器。
 
     匹配并掩码以下敏感信息：
+    - JWT token: "eyJ..." → "eyJ***"
+    - tenant_access_token: "t-xxx" → "t-***"
+    - app_access_token: "a-xxx" → "a-***"
+    - App Secret: "app_secret": "xxx" → "app_secret": "***"
+    - App ID: "cli_xxx" → "cli_xxx***"（保留前8位）
+    - URL code: "?code=xxx" → "?code=***"
+    - JSON code: "code": "xxx" → "code": "***"
     - Bearer token: "Bearer xxx" → "Bearer ***"
-    - 飞书 token: "t-xxxxxxxx" → "t-****"
-    - app_secret 值: 超过8位的连续字母数字 → 前4位 + "****"
     """
 
-    _PATTERNS: list[tuple[re.Pattern[str], str]] = [
-        (re.compile(r"Bearer\s+\S+", re.IGNORECASE), "Bearer ***"),
-        (re.compile(r"\bt-[a-zA-Z0-9]{8,}\b"), "t-****"),
-        (re.compile(r"(app_secret[\"':\s=]+)[a-zA-Z0-9]{8,}", re.IGNORECASE), r"\1****"),
+    # 脱敏规则: (正则模式, 替换字符串或 callable)
+    _PATTERNS: list[tuple[re.Pattern[str], str | Callable[[re.Match[str]], str]]] = [
+        # 1. JWT 格式 token (user_access_token, refresh_token)
+        (re.compile(r"\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+"), "eyJ***"),
+
+        # 2. tenant_access_token (t-前缀 + 至少20字符)
+        (re.compile(r"\bt-[A-Za-z0-9_-]{20,}\b"), "t-***"),
+
+        # 3. app_access_token (a-前缀 + 至少20字符)
+        (re.compile(r"\ba-[A-Za-z0-9_-]{20,}\b"), "a-***"),
+
+        # 4. App Secret (限定 JSON key 上下文)
+        # 匹配: "app_secret": / "client_secret": / "secret": / "app_Secret":
+        (
+            re.compile(
+                r'("(?:app_?secret|client_secret|secret)"\s*:\s*")([A-Za-z0-9_]{8,})(")',
+                re.IGNORECASE,
+            ),
+            r"\1***\3",
+        ),
+
+        # 5. App ID (cli_前缀 + 至少16位)
+        # 保留前8位用于调试: cli_a879***
+        (
+            re.compile(r"\bcli_[a-z0-9]{16,}\b"),
+            lambda m: f"{m.group()[:8]}***",
+        ),
+
+        # 6. URL 中的授权码 code 参数
+        (re.compile(r"([?&]code=)[A-Za-z0-9_-]{16,}"), r"\1***"),
+
+        # 7. JSON code 字段 (字符串值，数字 code 不匹配)
+        (re.compile(r'("code"\s*:\s*")([A-Za-z0-9_-]{16,})(")'), r"\1***\3"),
+
+        # 8. Bearer Authorization Header (兜底)
+        (re.compile(r"(Bearer\s+)\S{20,}", re.IGNORECASE), r"\1***"),
     ]
 
     def filter(self, record: logging.LogRecord) -> bool:
-        msg = record.getMessage()
-        for pattern, replacement in self._PATTERNS:
-            msg = pattern.sub(replacement, msg)
-        record.msg = msg
-        record.args = None  # 避免 % 格式化时还原原文
+        """过滤并脱敏日志记录。
+
+        Args:
+            record: 日志记录对象
+
+        Returns:
+            总是返回 True（允许记录通过），但会修改 record.msg 和 record.args
+        """
+        # 脱敏 msg
+        if isinstance(record.msg, str):
+            record.msg = self._mask(record.msg)
+
+        # 脱敏 args (格式化参数)
+        if record.args:
+            if isinstance(record.args, dict):
+                record.args = {k: self._mask_value(v) for k, v in record.args.items()}
+            elif isinstance(record.args, tuple):
+                record.args = tuple(self._mask_value(a) for a in record.args)
+
         return True
+
+    def _mask(self, text: str) -> str:
+        """对字符串应用所有脱敏规则。"""
+        for pattern, repl in self._PATTERNS:
+            text = pattern.sub(repl, text)
+        return text
+
+    def _mask_value(self, value: Any) -> Any:
+        """递归脱敏任意值（处理嵌套 dict/list）。"""
+        if isinstance(value, str):
+            return self._mask(value)
+        elif isinstance(value, dict):
+            return {k: self._mask_value(v) for k, v in value.items()}
+        elif isinstance(value, list):
+            return [self._mask_value(item) for item in value]
+        return value
 
 
 def setup_sdk_logger(level: str = "INFO") -> logging.Logger:

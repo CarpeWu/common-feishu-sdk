@@ -14,3 +14,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - 项目初始化
+
+## [0.2.0] - 2025-03-05
+
+### Added
+- feat(client): implement Feishu main class with thread-safe named registry
+- feat(config): implement FeishuConfig with environment variable loading
+- feat(exceptions): implement exception hierarchy with translate_error()
+- feat(log): implement SDK logger with SensitiveFilter for log sanitization
+- feat(models): implement PageResult generic dataclass
+- feat(retry): implement with_retry decorator with exponential backoff
+- feat(services): implement BaseService with _check_response and _log_call
