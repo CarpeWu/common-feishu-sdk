@@ -48,8 +48,9 @@ ylhp-common-feishu-sdk：基于飞书官方 lark-oapi SDK 的薄封装层，
 2. **构建**: `uv build`（生成 dist/ 目录下的 .tar.gz 和 .whl 文件）
 3. **发布到公司 Gitea**:
    ```bash
-   uv publish -u <用户名> -p <密码> --publish-url https://<gitea域名>/api/packages/<组织名>/pypi
+   uv publish -u <用户名> -p <密码> --publish-url https://<gitea域名>/api/packages/<所有者>/pypi
    ```
+   - `<所有者>` = 用户名 或 组织名（取决于发布到个人还是组织空间）
 
 **注意**: 版本号必须更改，否则发布会失败。
 
