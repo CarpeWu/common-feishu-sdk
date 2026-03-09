@@ -11,3 +11,6 @@ wheels/
 # Virtual environments
 .venv
 .env
+
+# Local publish scripts (may contain tokens)
+PUBLISH.sh
