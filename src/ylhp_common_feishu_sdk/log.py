@@ -1,10 +1,12 @@
-"""SDK 专用 logger（不污染宿主应用）和日志脱敏 Filter。
+"""SDK 专用 logger 和日志脱敏 Filter。
 
 设计决策:
   - 使用标准库 logging 的 named logger ("ylhp_common_feishu_sdk")
-  - propagate=False，不影响宿主应用的 root logger
-  - 脱敏 Filter 通过正则匹配，将敏感信息替换为掩码
-  - 幂等: 多次调用不会重复添加 handler
+  - propagate=True：日志自然冒泡给宿主 root logger，由宿主决定格式和输出位置
+  - 不添加 StreamHandler：SDK 不干涉日志输出格式
+  - NullHandler：防止宿主未配置日志时报 "No handlers could be found" 警告
+  - SensitiveFilter 挂在 logger 上：向上传播前已完成脱敏，安全有保障
+  - 幂等：多次调用不重复添加 handler/filter
 
 脱敏设计原则:
   - 最小暴露: 只保留用于调试的前几位，其余全部掩码
@@ -117,10 +119,22 @@ class SensitiveFilter(logging.Filter):
 def setup_sdk_logger(level: str = "INFO") -> logging.Logger:
     """配置 SDK 专用 logger。
 
-    - logger name: "ylhp_common_feishu_sdk"
-    - propagate: False（不传播到 root logger）
-    - 添加 SensitiveFilter 脱敏
-    - 幂等: 多次调用不会重复添加 handler
+    设计决策:
+      - propagate=True：日志自然冒泡给宿主 root logger，由宿主决定格式和输出位置
+      - 不添加 StreamHandler：SDK 不干涉日志输出格式
+      - NullHandler：防止宿主未配置日志时报 "No handlers could be found" 警告
+      - SensitiveFilter 挂在 logger 上：向上传播前已完成脱敏，安全有保障
+      - 幂等：多次调用不重复添加
+
+    宿主使用示例:
+        ```python
+        # 宿主正常配置自己的 logging 即可
+        import logging
+        logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(message)s")
+
+        # 单独调整 SDK 日志级别
+        logging.getLogger("ylhp_common_feishu_sdk").setLevel(logging.WARNING)
+        ```
 
     Args:
         level: 日志级别（DEBUG / INFO / WARNING / ERROR）
@@ -130,17 +144,15 @@ def setup_sdk_logger(level: str = "INFO") -> logging.Logger:
     """
     logger = logging.getLogger("ylhp_common_feishu_sdk")
     logger.setLevel(getattr(logging, level.upper(), logging.INFO))
-    logger.propagate = False
 
-    if not logger.handlers:
-        handler = logging.StreamHandler()
-        handler.setFormatter(
-            logging.Formatter(
-                fmt="%(asctime)s [%(name)s] %(levelname)s %(message)s",
-                datefmt="%Y-%m-%d %H:%M:%S",
-            )
-        )
-        handler.addFilter(SensitiveFilter())
-        logger.addHandler(handler)
+    # propagate 保持默认 True，让日志自然冒泡给宿主
+
+    # 幂等：只在没有 NullHandler 时添加
+    if not any(isinstance(h, logging.NullHandler) for h in logger.handlers):
+        logger.addHandler(logging.NullHandler())
+
+    # 幂等：只在没有 SensitiveFilter 时添加
+    if not any(isinstance(f, SensitiveFilter) for f in logger.filters):
+        logger.addFilter(SensitiveFilter())
 
     return logger
