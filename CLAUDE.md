@@ -15,8 +15,8 @@ ylhp-common-feishu-sdk：基于飞书官方 lark-oapi SDK 的薄封装层，
 6. **日志必须脱敏**。token、secret、authorization 等字段在日志中必须被掩码。
 7. **H5 授权的 code 不重试**。code 是一次性的。get_user_info 内部分两步：步骤1不重试，步骤2可重试。
 8. **选择性重试**。@with_retry 从 self._config 动态读取重试参数。只对 retryable=True 的异常重试。最终失败时记录总重试次数和总耗时。
-9. **返回类型化对象**。Service 方法返回 dataclass 实例（UserInfo、Department 等），不返回 dict。
-10. **日志不污染宿主应用**。使用标准库 logging 的 named logger ("ylhp_common_feishu_sdk")，propagate=False。
+9. **返回类型化对象**。Service 方法返回 Pydantic 模型实例（UserInfo、Department 等），不返回 dict。
+10. **日志冒泡到宿主**。SDK 使用 NullHandler + propagate=True，让日志自然冒泡给宿主应用的 root logger。
 
 ## 飞书 API 与 lark-oapi 方法映射（重要！）
 | 本 SDK 方法 | 飞书 API | lark-oapi 调用 | Request 类 |

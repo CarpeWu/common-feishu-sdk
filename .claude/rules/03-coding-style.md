@@ -1,7 +1,7 @@
 # 编码风格规则（必须遵守）
 
 ## 不可变优先
-- dataclass 使用 frozen=True
+- 出参模型使用 Pydantic BaseModel（frozen=True）
 - FeishuConfig 创建后禁止修改
 - 函数内不要修改传入的 dict/list，用展开或 copy
 
