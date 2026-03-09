@@ -397,7 +397,7 @@ ylhp-common-feishu-sdk/
 │       ├── config.py                 # FeishuConfig (dataclass + 环境变量)
 │       ├── exceptions.py             # 异常体系 (分级 + retryable 属性)
 │       ├── log.py                    # 标准库 logging + 脱敏 Filter
-│       ├── models.py                 # Pydantic 入参模型 + dataclass 响应模型
+│       ├── models.py                 # Pydantic 入参模型 + Pydantic 出参模型（frozen）
 │       ├── _retry.py                 # 动态重试装饰器
 │       │
 │       └── services/
@@ -724,13 +724,14 @@ def translate_error(
 """
 文件: src/ylhp_common_feishu_sdk/log.py
 职责:
-  - SDK 专用 logger（不污染宿主应用）
+  - SDK 专用 logger（日志冒泡给宿主应用）
   - 日志脱敏 Filter（防止 token/secret 泄露）
 
 设计决策:
   - 使用标准库 logging 的 named logger ("ylhp_common_feishu_sdk")
-  - propagate=False，不影响宿主应用的 root logger
-  - 脱敏 Filter 通过正则匹配，将敏感信息替换为掩码
+  - propagate=True（默认），日志自然冒泡给宿主应用的 root logger
+  - 添加 NullHandler 防止宿主未配置日志时出现警告
+  - SensitiveFilter 挂在 logger 上，日志向上传播前已完成脱敏
 """
 from __future__ import annotations
 
@@ -847,18 +848,14 @@ def setup_sdk_logger(level: str = "INFO") -> logging.Logger:
     """
     logger = logging.getLogger("ylhp_common_feishu_sdk")
     logger.setLevel(getattr(logging, level.upper(), logging.INFO))
-    logger.propagate = False
 
-    if not logger.handlers:
-        handler = logging.StreamHandler()
-        handler.setFormatter(
-            logging.Formatter(
-                fmt="%(asctime)s [%(name)s] %(levelname)s %(message)s",
-                datefmt="%Y-%m-%d %H:%M:%S",
-            )
-        )
-        handler.addFilter(SensitiveFilter())
-        logger.addHandler(handler)
+    # 幂等：只在没有 NullHandler 时添加
+    if not any(isinstance(h, logging.NullHandler) for h in logger.handlers):
+        logger.addHandler(logging.NullHandler())
+
+    # 幂等：只在没有 SensitiveFilter 时添加
+    if not any(isinstance(f, SensitiveFilter) for f in logger.filters):
+        logger.addFilter(SensitiveFilter())
 
     return logger
 ```
@@ -872,22 +869,22 @@ def setup_sdk_logger(level: str = "INFO") -> logging.Logger:
 文件: src/ylhp_common_feishu_sdk/models.py
 职责: SDK 全部数据模型
 
-设计决策 — "进严出宽":
-  - 入参（Pydantic BaseModel）: 调用 API 前严格校验，校验失败立即报错，不发请求
-  - 出参（dataclass）: 从 API 响应构造，使用 getattr 兜底，容忍飞书字段缺失
+设计决策 — 统一使用 Pydantic:
+  - 入参（BaseModel）: 调用 API 前严格校验，校验失败立即报错，不发请求
+  - 出参（BaseModel + frozen=True）: 从 API 响应构造，from_attributes=True 直接解析 lark-oapi 对象
 
-为什么入参用 Pydantic、出参用 dataclass:
-  - 入参需要丰富的校验能力（URL 格式、非空、长度等）
-  - 出参只需要类型提示和 IDE 补全，不需要校验
-  - dataclass 比 Pydantic 轻量，且可以用 frozen=True 保证不可变
+为什么出参也用 Pydantic:
+  - from_attributes=True 可直接解析 lark-oapi 原生对象，无需手动提取字段
+  - extra="ignore" 容忍飞书新增字段，不报错
+  - frozen=True 保证不可变且可哈希
+  - 统一技术栈，Service 层用 model_validate() 替代散落的 getattr
 """
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass, field
 from typing import Any, Generic, TypeVar
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, ConfigDict, computed_field, field_validator
 
 # ══════════════════════════════════════════
 # 入参模型（Pydantic — 严格校验）
@@ -982,16 +979,23 @@ class SendMessageRequest(BaseModel):
 
 
 # ══════════════════════════════════════════
-# 出参模型（dataclass — 轻量只读）
+# 出参模型（Pydantic BaseModel — 不可变）
 # ══════════════════════════════════════════
+
+# 出参模型统一配置
+_OUT_CONFIG = ConfigDict(
+    from_attributes=True,  # 直接解析 lark-oapi 原生对象
+    extra="ignore",        # 飞书新增字段时静默忽略
+    frozen=True,           # 不可变且可哈希
+)
 
 T = TypeVar("T")
 
 
-@dataclass(frozen=True)
-class UserInfo:
+class UserInfo(BaseModel):
     """用户基本信息（H5 登录返回 / 部门员工列表条目）。"""
 
+    model_config = _OUT_CONFIG
     open_id: str
     name: str
     en_name: str | None = None
@@ -999,30 +1003,30 @@ class UserInfo:
     email: str | None = None
     mobile: str | None = None
     tenant_key: str | None = None
-    department_ids: list[str] = field(default_factory=list)
+    department_ids: list[str] = []
 
 
-@dataclass(frozen=True)
-class UserDetail:
+class UserDetail(BaseModel):
     """用户详细信息（get_user 返回）。"""
 
+    model_config = _OUT_CONFIG
     open_id: str
     name: str
     en_name: str | None = None
     avatar_url: str | None = None
     email: str | None = None
     mobile: str | None = None
-    department_ids: list[str] = field(default_factory=list)
+    department_ids: list[str] = []
     job_title: str | None = None
     is_activated: bool | None = None
     is_frozen: bool | None = None
     is_resigned: bool | None = None
 
 
-@dataclass(frozen=True)
-class Department:
+class Department(BaseModel):
     """部门信息。"""
 
+    model_config = _OUT_CONFIG
     department_id: str
     open_department_id: str
     name: str
@@ -1031,8 +1035,7 @@ class Department:
     member_count: int | None = None
 
 
-@dataclass(frozen=True)
-class PageResult(Generic[T]):
+class PageResult[T](BaseModel):
     """分页查询结果。
 
     Attributes:
@@ -1041,6 +1044,7 @@ class PageResult(Generic[T]):
         has_more: 是否还有更多数据
     """
 
+    model_config = ConfigDict(frozen=True, arbitrary_types_allowed=True)
     items: list[T]
     page_token: str | None = None
     has_more: bool = False
@@ -2560,8 +2564,8 @@ ylhp-common-feishu-sdk：基于飞书官方 lark-oapi SDK 的薄封装层，
 6. **日志必须脱敏**。token、secret、authorization 等字段在日志中必须被掩码。
 7. **H5 授权的 code 不重试**。code 是一次性的。get_user_info 内部分两步：步骤1不重试，步骤2可重试。
 8. **选择性重试**。@with_retry 从 self._config 动态读取重试参数。只对 retryable=True 的异常重试。最终失败时记录总重试次数和总耗时。
-9. **返回类型化对象**。Service 方法返回 dataclass 实例（UserInfo、Department 等），不返回 dict。
-10. **日志不污染宿主应用**。使用标准库 logging 的 named logger ("ylhp_common_feishu_sdk")，propagate=False。
+9. **返回类型化对象**。Service 方法返回 Pydantic 模型实例（UserInfo、Department 等），不返回 dict。
+10. **日志冒泡到宿主**。SDK 使用 NullHandler + propagate=True，让日志自然冒泡给宿主应用的 root logger。
 
 ## 飞书 API 与 lark-oapi 方法映射（重要！）
 | 本 SDK 方法 | 飞书 API | lark-oapi 调用 | Request 类 |
