@@ -140,14 +140,6 @@ class AuthService(BaseService):
 
         self._check_response(resp, "获取用户信息")
 
-        user = resp.data.user_info
-        return UserInfo(
-            open_id=user.open_id,
-            name=user.name,
-            en_name=getattr(user, "en_name", None),
-            avatar_url=getattr(user, "avatar_url", None),
-            email=getattr(user, "email", None),
-            mobile=getattr(user, "mobile", None),
-            tenant_key=getattr(user, "tenant_key", None),
-            department_ids=getattr(user, "department_ids", []),
-        )
+        # OIDC 接口直接返回 avatar_url 字符串（非嵌套对象）
+        # from_attributes=True 自动读取，raw_avatar_url 字段捕获
+        return UserInfo.model_validate(resp.data.user_info)

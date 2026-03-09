@@ -10,6 +10,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - 初始项目结构
 
+### Changed
+- refactor(log): SDK logger now uses NullHandler + propagate=True, logs bubble to host root logger
+- refactor(models): output models converted from dataclass to Pydantic BaseModel with from_attributes=True
+
 ## [0.1.1] - 2025-02-28
 
 ### Added

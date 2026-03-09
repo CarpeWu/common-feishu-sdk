@@ -32,9 +32,28 @@ def make_success_user_info_response(user_info: dict) -> MagicMock:
     resp.success = True
     resp.data = MagicMock()
     resp.data.user_info = MagicMock()
-    # 手动设置每个属性，确保返回实际值而非 MagicMock
+
+    # UserInfo 模型中所有可选字段的默认值
+    # 当 MagicMock 访问未设置的属性时会返回新的 MagicMock，
+    # 这会导致 Pydantic model_validate 失败
+    default_fields = {
+        "en_name": None,
+        "email": None,
+        "mobile": None,
+        "tenant_key": None,
+        "department_ids": [],
+        "avatar": None,  # alias for raw_avatar
+        "avatar_url": None,  # alias for raw_avatar_url
+    }
+
+    # 先设置默认值
+    for key, value in default_fields.items():
+        setattr(resp.data.user_info, key, value)
+
+    # 再用传入的值覆盖
     for key, value in user_info.items():
         setattr(resp.data.user_info, key, value)
+
     return resp
 
 
@@ -248,10 +267,12 @@ class TestUserInfo:
     """UserInfo dataclass 测试。"""
 
     def test_user_info_frozen(self) -> None:
-        """UserInfo 是不可变的。"""
+        """UserInfo 是不可变的（Pydantic frozen 模型）。"""
+        from pydantic import ValidationError
+
         user = UserInfo(open_id="ou_test", name="Test")
 
-        with pytest.raises(AttributeError):
+        with pytest.raises(ValidationError):
             user.open_id = "ou_modified"  # type: ignore
 
     def test_user_info_optional_fields(self) -> None:

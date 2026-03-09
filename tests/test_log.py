@@ -67,39 +67,77 @@ class TestSensitiveFilter:
 class TestSetupSdkLogger:
     """测试 setup_sdk_logger 函数。"""
 
-    def test_sdk_logger_independent(self) -> None:
-        """SDK logger 不应该影响 root logger。"""
-        # 清理已有的 handler
+    def test_sdk_logger_propagate_true(self) -> None:
+        """SDK logger 应该将日志冒泡给 root logger。"""
+        # 清理已有的 handler 和 filter
         sdk_logger = logging.getLogger("ylhp_common_feishu_sdk")
         sdk_logger.handlers.clear()
+        sdk_logger.filters.clear()
 
         # 设置 SDK logger
         logger = setup_sdk_logger("DEBUG")
 
-        # 检查 propagate 为 False
-        assert logger.propagate is False
+        # 检查 propagate 为 True（默认值）
+        assert logger.propagate is True
 
-        # 检查 root logger 不受影响
-        root_logger = logging.getLogger()
-        # root logger 不应该有 ylhp_common_feishu_sdk 的 handler
-        assert all(h not in logger.handlers for h in root_logger.handlers)
+    def test_null_handler_added(self) -> None:
+        """应该添加 NullHandler 防止 "No handlers" 警告。"""
+        # 清理已有的 handler
+        sdk_logger = logging.getLogger("ylhp_common_feishu_sdk")
+        sdk_logger.handlers.clear()
 
-    def test_setup_idempotent(self) -> None:
-        """多次调用 setup_sdk_logger 不应该重复添加 handler。"""
+        logger = setup_sdk_logger("INFO")
+
+        # 应该有一个 NullHandler
+        assert any(isinstance(h, logging.NullHandler) for h in logger.handlers)
+
+    def test_sensitive_filter_added(self) -> None:
+        """应该添加 SensitiveFilter 进行脱敏。"""
+        # 清理已有的 filter
+        sdk_logger = logging.getLogger("ylhp_common_feishu_sdk")
+        sdk_logger.filters.clear()
+
+        logger = setup_sdk_logger("INFO")
+
+        # 应该有一个 SensitiveFilter
+        assert any(isinstance(f, SensitiveFilter) for f in logger.filters)
+
+    def test_setup_idempotent_handler(self) -> None:
+        """多次调用 setup_sdk_logger 不应该重复添加 NullHandler。"""
         # 清理已有的 handler
         sdk_logger = logging.getLogger("ylhp_common_feishu_sdk")
         sdk_logger.handlers.clear()
 
         # 第一次设置
         logger1 = setup_sdk_logger("INFO")
-        handler_count = len(logger1.handlers)
+        null_handler_count = sum(1 for h in logger1.handlers if isinstance(h, logging.NullHandler))
 
         # 第二次设置
         logger2 = setup_sdk_logger("DEBUG")
+        new_null_handler_count = sum(
+            1 for h in logger2.handlers if isinstance(h, logging.NullHandler)
+        )
 
-        # handler 数量不应该增加
-        assert len(logger2.handlers) == handler_count
+        # NullHandler 数量不应该增加
+        assert new_null_handler_count == null_handler_count == 1
         assert logger2 is logger1  # 应该返回同一个 logger 实例
+
+    def test_setup_idempotent_filter(self) -> None:
+        """多次调用 setup_sdk_logger 不应该重复添加 SensitiveFilter。"""
+        # 清理已有的 filter
+        sdk_logger = logging.getLogger("ylhp_common_feishu_sdk")
+        sdk_logger.filters.clear()
+
+        # 第一次设置
+        logger1 = setup_sdk_logger("INFO")
+        filter_count = sum(1 for f in logger1.filters if isinstance(f, SensitiveFilter))
+
+        # 第二次设置
+        logger2 = setup_sdk_logger("DEBUG")
+        new_filter_count = sum(1 for f in logger2.filters if isinstance(f, SensitiveFilter))
+
+        # Filter 数量不应该增加
+        assert new_filter_count == filter_count == 1
 
     def test_log_level_set(self) -> None:
         """日志级别应该正确设置。"""
@@ -112,6 +150,17 @@ class TestSetupSdkLogger:
 
         logger = setup_sdk_logger("debug")
         assert logger.level == logging.DEBUG
+
+    def test_no_stream_handler(self) -> None:
+        """SDK 不应该添加 StreamHandler。"""
+        # 清理已有的 handler
+        sdk_logger = logging.getLogger("ylhp_common_feishu_sdk")
+        sdk_logger.handlers.clear()
+
+        logger = setup_sdk_logger("INFO")
+
+        # 不应该有 StreamHandler
+        assert not any(isinstance(h, logging.StreamHandler) for h in logger.handlers)
 
 
 class TestSensitiveFilterExtended:

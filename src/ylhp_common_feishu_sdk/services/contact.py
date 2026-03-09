@@ -118,20 +118,10 @@ class ContactService(BaseService):
         resp = self._client.contact.v3.department.children(req)
         self._check_response(resp, "list_departments")
 
-        items: list[Department] = []
-        if resp.data and resp.data.items:
-            for dept in resp.data.items:
-                items.append(
-                    Department(
-                        department_id=dept.department_id,
-                        open_department_id=dept.open_department_id,
-                        name=dept.name,
-                        parent_department_id=getattr(dept, "parent_department_id", None),
-                        leader_user_id=getattr(dept, "leader_user_id", None),
-                        member_count=getattr(dept, "member_count", None),
-                    )
-                )
+        # from_attributes=True：Pydantic 自动处理字段缺失，getattr 全部消除
+        items = [Department.model_validate(d) for d in (resp.data.items or [])]
 
+        # resp.data 是 lark 根响应对象，保留 getattr 兜底合理
         return PageResult(
             items=items,
             page_token=getattr(resp.data, "page_token", None),
@@ -223,22 +213,8 @@ class ContactService(BaseService):
         resp = self._client.contact.v3.user.find_by_department(req)
         self._check_response(resp, "list_department_users")
 
-        items: list[UserInfo] = []
-        if resp.data and resp.data.items:
-            for user in resp.data.items:
-                avatar = getattr(user, "avatar", None)
-                items.append(
-                    UserInfo(
-                        open_id=user.open_id,
-                        name=user.name,
-                        en_name=getattr(user, "en_name", None),
-                        avatar_url=getattr(avatar, "avatar_72", None) if avatar else None,
-                        email=getattr(user, "email", None),
-                        mobile=getattr(user, "mobile", None),
-                        tenant_key=getattr(user, "tenant_key", None),
-                        department_ids=getattr(user, "department_ids", []),
-                    )
-                )
+        # 通讯录接口返回嵌套对象 avatar.avatar_72，由 UserInfo.raw_avatar 捕获
+        items = [UserInfo.model_validate(u) for u in (resp.data.items or [])]
 
         return PageResult(
             items=items,
@@ -317,20 +293,19 @@ class ContactService(BaseService):
         resp = self._client.contact.v3.user.get(req)
         self._check_response(resp, "get_user")
 
-        user = resp.data.user
-        avatar = getattr(user, "avatar", None)
-        status = getattr(user, "status", None)
+        # 第一步：model_validate 直接解析所有扁平字段（含 avatar 嵌套对象）
+        base_detail = UserDetail.model_validate(resp.data.user)
 
-        return UserDetail(
-            open_id=user.open_id,
-            name=user.name,
-            en_name=getattr(user, "en_name", None),
-            avatar_url=getattr(avatar, "avatar_72", None) if avatar else None,
-            email=getattr(user, "email", None),
-            mobile=getattr(user, "mobile", None),
-            department_ids=getattr(user, "department_ids", []),
-            job_title=getattr(user, "job_title", None),
-            is_activated=getattr(status, "is_activated", None) if status else None,
-            is_frozen=getattr(status, "is_frozen", None) if status else None,
-            is_resigned=getattr(status, "is_resigned", None) if status else None,
+        # 第二步：局部消化 status 嵌套（仅此接口特有，不值得在模型层处理）
+        status = getattr(resp.data.user, "status", None)
+        if not status:
+            return base_detail
+
+        # model_copy(update=...) 是 frozen 模型局部更新的标准做法，返回新实例
+        return base_detail.model_copy(
+            update={
+                "is_activated": getattr(status, "is_activated", None),
+                "is_frozen": getattr(status, "is_frozen", None),
+                "is_resigned": getattr(status, "is_resigned", None),
+            }
         )
