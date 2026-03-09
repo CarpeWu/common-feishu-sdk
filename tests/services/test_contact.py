@@ -64,15 +64,21 @@ def make_user_item(
 ) -> MagicMock:
     """创建用户响应项。"""
     item = MagicMock()
+    # 必填字段
     item.open_id = open_id
     item.name = name
-    item.en_name = "Zhang San"
+    # 可选字段（显式设置为 None 或实际值，避免 MagicMock 自动创建）
+    item.en_name = None
     item.email = email
-    item.mobile = "+8613800138000"
+    item.mobile = None
+    item.tenant_key = None
     item.department_ids = ["od_dept1"]
+    # avatar 嵌套对象
     avatar = MagicMock()
     avatar.avatar_72 = "https://example.com/avatar/72.jpg"
     item.avatar = avatar
+    # 防止 MagicMock 自动创建其他属性
+    item.avatar_url = None
     return item
 
 

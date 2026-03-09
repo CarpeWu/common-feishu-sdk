@@ -49,16 +49,18 @@ class TestPageResult:
 
     def test_page_result_frozen(self) -> None:
         """PageResult 应该是不可变的。"""
+        from pydantic import ValidationError
+
         result = PageResult(items=["a"], page_token=None, has_more=False)
         try:
             result.items.append("b")  # list 本身是可变的，但这不影响 frozen
         except AttributeError:
             pass  # 如果是 tuple 就会报错
 
-        # 但不能重新赋值
+        # 但不能重新赋值（Pydantic frozen 会抛 ValidationError）
         try:
             result.has_more = True  # type: ignore[misc]
-        except (AttributeError, TypeError):
+        except ValidationError:
             pass  # frozen=True 应该阻止赋值
 
 
@@ -101,12 +103,10 @@ class TestPageResultBoundary:
         result2 = PageResult(items=["b"], page_token=None, has_more=False)
         assert result1 != result2
 
-    def test_page_result_asdict(self) -> None:
-        """可以使用 dataclasses.asdict 序列化。"""
-        from dataclasses import asdict
-
+    def test_page_result_model_dump(self) -> None:
+        """可以使用 model_dump() 序列化。"""
         result = PageResult(items=["a", "b"], page_token="next", has_more=True)
-        d = asdict(result)
+        d = result.model_dump()
         assert d == {"items": ["a", "b"], "page_token": "next", "has_more": True}
 
     def test_page_result_repr(self) -> None:
