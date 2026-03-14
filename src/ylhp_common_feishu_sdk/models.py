@@ -40,7 +40,7 @@ class AvatarObj(BaseModel):
     """
 
     model_config = _OUT_CONFIG
-    avatar_72: str | None = None
+    avatar_72: str | None = Field(default=None, description="72x72 头像 URL")
 
 
 class PageResult[T](BaseModel):
@@ -48,9 +48,9 @@ class PageResult[T](BaseModel):
 
     model_config = ConfigDict(frozen=True, arbitrary_types_allowed=True)
 
-    items: list[T]
-    page_token: str | None = None
-    has_more: bool = False
+    items: list[T] = Field(description="当前页数据列表")
+    page_token: str | None = Field(default=None, description="下一页分页标记")
+    has_more: bool = Field(default=False, description="是否还有更多数据")
 
 
 class UserInfo(BaseModel):
@@ -69,18 +69,22 @@ class UserInfo(BaseModel):
 
     model_config = _OUT_CONFIG
 
-    open_id: str
-    name: str
-    en_name: str | None = None
-    email: str | None = None
-    mobile: str | None = None
-    tenant_key: str | None = None
-    department_ids: list[str] = Field(default_factory=list)
+    open_id: str = Field(description="用户的 open_id")
+    name: str = Field(description="用户姓名")
+    en_name: str | None = Field(default=None, description="用户英文名")
+    email: str | None = Field(default=None, description="用户邮箱")
+    mobile: str | None = Field(default=None, description="用户手机号")
+    tenant_key: str | None = Field(default=None, description="租户 key")
+    department_ids: list[str] = Field(default_factory=list, description="所属部门 ID 列表")
 
     # 通讯录接口返回嵌套对象 avatar.avatar_72，OIDC 接口直接返回扁平字符串 avatar_url
     # 两个隐藏字段分别捕获，computed_field 合并后对外统一暴露 avatar_url
-    raw_avatar: AvatarObj | None = Field(default=None, alias="avatar", exclude=True, repr=False)
-    raw_avatar_url: str | None = Field(default=None, alias="avatar_url", exclude=True, repr=False)
+    raw_avatar: AvatarObj | None = Field(
+        default=None, alias="avatar", exclude=True, repr=False, description="头像嵌套对象"
+    )
+    raw_avatar_url: str | None = Field(
+        default=None, alias="avatar_url", exclude=True, repr=False, description="头像 URL 字符串"
+    )
 
     @computed_field
     @property
@@ -105,12 +109,12 @@ class Department(BaseModel):
 
     model_config = _OUT_CONFIG
 
-    department_id: str
-    open_department_id: str
-    name: str
-    parent_department_id: str | None = None
-    leader_user_id: str | None = None
-    member_count: int | None = None
+    department_id: str = Field(description="部门 ID")
+    open_department_id: str = Field(description="部门 open_department_id")
+    name: str = Field(description="部门名称")
+    parent_department_id: str | None = Field(default=None, description="父部门 ID")
+    leader_user_id: str | None = Field(default=None, description="部门主管用户 ID")
+    member_count: int | None = Field(default=None, description="部门成员数量")
 
 
 class UserDetail(BaseModel):
@@ -132,22 +136,24 @@ class UserDetail(BaseModel):
 
     model_config = _OUT_CONFIG
 
-    open_id: str
-    name: str
-    en_name: str | None = None
-    email: str | None = None
-    mobile: str | None = None
-    department_ids: list[str] = Field(default_factory=list)
-    job_title: str | None = None
+    open_id: str = Field(description="用户的 open_id")
+    name: str = Field(description="用户姓名")
+    en_name: str | None = Field(default=None, description="用户英文名")
+    email: str | None = Field(default=None, description="用户邮箱")
+    mobile: str | None = Field(default=None, description="用户手机号")
+    department_ids: list[str] = Field(default_factory=list, description="所属部门 ID 列表")
+    job_title: str | None = Field(default=None, description="用户职位")
 
     # status 字段（is_activated/is_frozen/is_resigned）仅 get_user 一个接口涉及，
     # 普通嵌套，由 Service 层提取后直接传入，模型层不做特殊处理
-    is_activated: bool | None = None
-    is_frozen: bool | None = None
-    is_resigned: bool | None = None
+    is_activated: bool | None = Field(default=None, description="是否已激活")
+    is_frozen: bool | None = Field(default=None, description="是否已冻结")
+    is_resigned: bool | None = Field(default=None, description="是否已离职")
 
     # avatar 同 UserInfo，需要防腐处理
-    raw_avatar: AvatarObj | None = Field(default=None, alias="avatar", exclude=True, repr=False)
+    raw_avatar: AvatarObj | None = Field(
+        default=None, alias="avatar", exclude=True, repr=False, description="头像嵌套对象"
+    )
 
     @computed_field
     @property
@@ -169,8 +175,8 @@ class AuthorizeUrlParams(BaseModel):
         state: 状态参数（可选）
     """
 
-    redirect_uri: str
-    state: str = ""
+    redirect_uri: str = Field(description="授权回调地址，须以 http:// 或 https:// 开头")
+    state: str = Field(default="", description="自定义状态参数，用于防 CSRF 攻击")
 
     @field_validator("redirect_uri")
     @classmethod
@@ -187,7 +193,7 @@ class AuthCodeRequest(BaseModel):
         code: 授权码（不能为空）
     """
 
-    code: str
+    code: str = Field(description="飞书回调返回的临时授权码（一次性）")
 
     @field_validator("code")
     @classmethod
@@ -207,7 +213,7 @@ class TextContent(BaseModel):
         text: 文本内容（不能为空）
     """
 
-    text: str
+    text: str = Field(description="文本消息内容")
 
     @field_validator("text")
     @classmethod
@@ -228,7 +234,7 @@ class CardContent(BaseModel):
         card: 卡片内容字典（不能为空）
     """
 
-    card: dict[str, Any]
+    card: dict[str, Any] = Field(description="卡片内容字典，遵循飞书卡片消息协议")
 
     @field_validator("card")
     @classmethod
@@ -252,10 +258,10 @@ class SendMessageRequest(BaseModel):
         content: 消息内容（JSON 字符串）
     """
 
-    receive_id: str
-    receive_id_type: str = "open_id"
-    msg_type: str
-    content: str
+    receive_id: str = Field(description="消息接收者 ID")
+    receive_id_type: str = Field(default="open_id", description="接收者 ID 类型：open_id/user_id/union_id/chat_id/email")
+    msg_type: str = Field(description="消息类型：text/interactive/image 等")
+    content: str = Field(description="消息内容（JSON 字符串）")
 
     @field_validator("receive_id")
     @classmethod
@@ -273,8 +279,8 @@ class ReplyTextRequest(BaseModel):
         text: 回复的文本内容
     """
 
-    message_id: str
-    text: str
+    message_id: str = Field(description="被回复消息的 ID")
+    text: str = Field(description="回复的文本内容")
 
     @field_validator("message_id")
     @classmethod
