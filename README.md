@@ -105,8 +105,9 @@ msg_id = feishu.messages.send_text_to_chat(chat_id="oc_xxx", text="Hello Group!"
 
 # 发送卡片消息
 card = {
+    "config": {"wide_screen_mode": True},
     "elements": [
-        {"tag": "div", "text": {"content": "Hello from SDK!", "tag": "plain_text"}}
+        {"tag": "div", "text": {"tag": "plain_text", "content": "Hello from SDK!"}}
     ]
 }
 msg_id = feishu.messages.send_card(receive_id="ou_xxx", card=card)
@@ -130,8 +131,20 @@ hr = Feishu.get("hr")
 bot = Feishu.get("bot")
 
 # 分别操作不同应用
-hr.contacts.iter_departments()
-bot.messages.send_text("ou_xxx", "来自机器人")
+hr.contacts.iter_departments(parent_department_id="0")
+bot.messages.send_text(open_id="ou_xxx", text="来自机器人")
+```
+
+### 底层客户端访问
+
+如需调用 SDK 未封装的接口，可直接访问底层 lark-oapi 客户端：
+
+```python
+# 访问原生 lark-oapi 客户端
+from lark_oapi.api.contact.v3 import BatchGetIdUserRequest
+
+req = BatchGetIdUserRequest.builder().build()
+resp = feishu.lark_client.contact.v3.user.batch_get_id(req)
 ```
 
 ## 错误处理
@@ -150,16 +163,35 @@ from ylhp_common_feishu_sdk import (
 )
 
 try:
-    feishu.messages.send_text("ou_xxx", "Hello")
+    feishu.messages.send_text(open_id="ou_xxx", text="Hello")
 except FeishuValidationError as e:
-    print(f"参数错误: {e.message}")
+    # 参数校验失败
+    print(f"字段 {e.field} 校验失败: {e.detail}")
 except FeishuAuthError as e:
-    print(f"认证失败: {e.message}")
+    # 认证/权限错误
+    print(f"认证失败 [{e.code}]: {e.msg}")
 except FeishuRateLimitError as e:
-    print(f"触发限流: {e.message}")
+    # 触发限流
+    print(f"触发限流，建议等待 {e.retry_after} 秒后重试")
 except FeishuServerError as e:
-    print(f"服务端错误: {e.message}")
+    # 服务端错误
+    print(f"服务端错误 [{e.code}]: {e.msg}, log_id={e.log_id}")
+except FeishuAPIError as e:
+    # 其他 API 错误
+    print(f"API 错误 [{e.code}]: {e.msg}")
 ```
+
+**异常属性说明**：
+
+| 异常类 | 属性 | 类型 | 说明 |
+|--------|------|------|------|
+| `FeishuError` | `message` | `str` | 完整错误消息 |
+| `FeishuValidationError` | `field` | `str` | 校验失败的字段名 |
+| `FeishuValidationError` | `detail` | `str` | 详细错误信息 |
+| `FeishuAPIError` | `code` | `int` | 飞书错误码 |
+| `FeishuAPIError` | `msg` | `str` | 飞书错误消息 |
+| `FeishuAPIError` | `log_id` | `str \| None` | 请求日志 ID（提交工单用） |
+| `FeishuRateLimitError` | `retry_after` | `float \| None` | 建议等待秒数 |
 
 **重试机制**：
 - 自动重试：`FeishuServerError`、`FeishuRateLimitError`
@@ -173,10 +205,10 @@ except FeishuServerError as e:
 | `app_id` | `FEISHU_APP_ID` | - | 飞书应用 App ID（必填） |
 | `app_secret` | `FEISHU_APP_SECRET` | - | 飞书应用 App Secret（必填） |
 | `domain` | `FEISHU_DOMAIN` | `https://open.feishu.cn` | API 域名（私有化部署时修改） |
-| `log_level` | `FEISHU_LOG_LEVEL` | `INFO` | SDK 日志级别 |
+| `log_level` | `FEISHU_LOG_LEVEL` | `INFO` | SDK 日志级别（DEBUG/INFO/WARNING/ERROR） |
 | `timeout` | `FEISHU_TIMEOUT` | `10` | HTTP 请求超时时间（秒） |
 | `max_retries` | `FEISHU_MAX_RETRIES` | `3` | 最大重试次数 |
-| `retry_wait_seconds` | `FEISHU_RETRY_WAIT_SECONDS` | `1.0` | 重试基础等待时间（秒） |
+| `retry_wait_seconds` | `FEISHU_RETRY_WAIT_SECONDS` | `1.0` | 重试基础等待时间（秒），实际 = base × 2^attempt |
 
 ## 模块说明
 
@@ -199,10 +231,10 @@ except FeishuServerError as e:
 
 | 方法 | 说明 | 返回类型 |
 |------|------|---------|
-| `list_departments(...)` | 获取子部门列表（单页） | `PageResult[Department]` |
-| `iter_departments(...)` | 迭代获取所有子部门 | `Iterator[Department]` |
-| `list_department_users(department_id, ...)` | 获取部门员工列表（单页） | `PageResult[UserInfo]` |
-| `iter_department_users(department_id, ...)` | 迭代获取部门所有员工 | `Iterator[UserInfo]` |
+| `list_departments(parent_department_id="0", page_size=50, page_token=None, fetch_child=False)` | 获取子部门列表（单页） | `PageResult[Department]` |
+| `iter_departments(parent_department_id="0", page_size=50, fetch_child=False)` | 迭代获取所有子部门 | `Iterator[Department]` |
+| `list_department_users(department_id, page_size=50, page_token=None)` | 获取部门员工列表（单页） | `PageResult[UserInfo]` |
+| `iter_department_users(department_id, page_size=50)` | 迭代获取部门所有员工 | `Iterator[UserInfo]` |
 | `get_user(user_id, user_id_type="open_id")` | 获取用户详细信息 | `UserDetail` |
 
 ### MessagingService
@@ -213,6 +245,158 @@ except FeishuServerError as e:
 | `send_text_to_chat(chat_id, text)` | 发送群聊文本消息 | `str` (message_id) |
 | `send_card(receive_id, card, receive_id_type="open_id")` | 发送卡片消息 | `str` (message_id) |
 | `reply_text(message_id, text)` | 回复消息 | `str` (message_id) |
+
+**`send_card` 的 `receive_id_type` 可选值**：
+
+| 值 | 说明 |
+|----|------|
+| `"open_id"` | 用户 open_id（默认） |
+| `"user_id"` | 用户 user_id |
+| `"union_id"` | 用户 union_id |
+| `"chat_id"` | 群聊 ID |
+| `"email"` | 邮箱地址 |
+
+## 返回类型
+
+### UserInfo
+
+用户基本信息（H5 登录返回 / 部门员工列表条目）。
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `open_id` | `str` | 用户 open_id |
+| `name` | `str` | 用户姓名 |
+| `en_name` | `str \| None` | 英文名 |
+| `email` | `str \| None` | 邮箱 |
+| `mobile` | `str \| None` | 手机号 |
+| `tenant_key` | `str \| None` | 租户 key |
+| `department_ids` | `list[str]` | 所属部门 ID 列表 |
+| `avatar_url` | `str \| None` | 头像 URL |
+
+### UserDetail
+
+用户详细信息（`get_user` 返回）。包含 `UserInfo` 的大部分字段，以及以下扩展字段：
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `open_id` | `str` | 用户 open_id |
+| `name` | `str` | 用户姓名 |
+| `en_name` | `str \| None` | 英文名 |
+| `email` | `str \| None` | 邮箱 |
+| `mobile` | `str \| None` | 手机号 |
+| `department_ids` | `list[str]` | 所属部门 ID 列表 |
+| `avatar_url` | `str \| None` | 头像 URL |
+| `job_title` | `str \| None` | 职位 |
+| `is_activated` | `bool \| None` | 是否已激活 |
+| `is_frozen` | `bool \| None` | 是否已冻结 |
+| `is_resigned` | `bool \| None` | 是否已离职 |
+
+### Department
+
+部门信息。
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `department_id` | `str` | 部门 ID |
+| `open_department_id` | `str` | 部门 open_department_id |
+| `name` | `str` | 部门名称 |
+| `parent_department_id` | `str \| None` | 父部门 ID |
+| `leader_user_id` | `str \| None` | 部门主管用户 ID |
+| `member_count` | `int \| None` | 部门成员数量 |
+
+### PageResult[T]
+
+分页查询结果。
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `items` | `list[T]` | 当前页数据 |
+| `page_token` | `str \| None` | 下一页标记（用于获取下一页） |
+| `has_more` | `bool` | 是否有更多数据 |
+
+```python
+# 手动翻页示例
+result = feishu.contacts.list_departments()
+while result.has_more:
+    result = feishu.contacts.list_departments(page_token=result.page_token)
+```
+
+## 卡片消息
+
+卡片消息遵循飞书开放平台卡片消息协议。完整协议参考：[飞书卡片消息开发文档](https://open.feishu.cn/document/client-docs/bot-v3/card-card-create)
+
+### 原生卡片示例
+
+```python
+card = {
+    "config": {
+        "wide_screen_mode": True
+    },
+    "header": {
+        "title": {"tag": "plain_text", "content": "通知标题"},
+        "template": "blue"
+    },
+    "elements": [
+        {
+            "tag": "div",
+            "text": {"tag": "plain_text", "content": "这是消息内容"}
+        },
+        {
+            "tag": "action",
+            "actions": [
+                {
+                    "tag": "button",
+                    "text": {"tag": "plain_text", "content": "点击按钮"},
+                    "url": "https://example.com",
+                    "type": "primary"
+                }
+            ]
+        }
+    ]
+}
+feishu.messages.send_card(receive_id="ou_xxx", card=card)
+```
+
+### 模板卡片示例
+
+```python
+card = {
+    "type": "template",
+    "data": {
+        "template_id": "your_template_id",
+        "template_variable": {
+            "title": "动态标题",
+            "content": "动态内容"
+        }
+    }
+}
+feishu.messages.send_card(receive_id="ou_xxx", card=card)
+```
+
+## 导出的类型
+
+SDK 导出以下类型，可直接导入使用：
+
+```python
+from ylhp_common_feishu_sdk import (
+    # 客户端
+    Feishu,
+    FeishuConfig,
+    # 异常
+    FeishuError,
+    FeishuConfigError,
+    FeishuValidationError,
+    FeishuAuthError,
+    FeishuRateLimitError,
+    FeishuServerError,
+    FeishuAPIError,
+    # 返回类型
+    UserInfo,
+    UserDetail,
+    Department,
+    PageResult,
+)
+```
 
 ## 开发指南
 
