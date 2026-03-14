@@ -1,6 +1,6 @@
 [project]
 name = "ylhp-common-feishu-sdk"
-version = "1.0.0"
+version = "1.0.1"
 description = "公司内部飞书 API Python SDK — 一行代码搞定飞书"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -8,6 +8,11 @@ dependencies = [
     "lark-oapi>=1.5.3",
     "pydantic>=2.12.5",
 ]
+
+[project.urls]
+Homepage = "https://git.yinlihupo.cn/yinlihupo/common-feishu-sdk"
+Documentation = "https://git.yinlihupo.cn/yinlihupo/common-feishu-sdk/src/branch/main/README.md"
+Repository = "https://git.yinlihupo.cn/yinlihupo/common-feishu-sdk"
 
 [dependency-groups]
 dev = [

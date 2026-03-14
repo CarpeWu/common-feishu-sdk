@@ -170,7 +170,8 @@ class MessagingService(BaseService):
         Args:
             receive_id: 接收者 ID
             card: 卡片内容（字典格式，遵循飞书卡片消息协议）
-            receive_id_type: 接收者 ID 类型，默认 "open_id"
+            receive_id_type: 接收者 ID 类型，可选值：
+                "open_id"（默认）| "user_id" | "union_id" | "chat_id" | "email"
 
         Returns:
             消息 ID
