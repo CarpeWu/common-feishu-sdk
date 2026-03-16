@@ -13,6 +13,7 @@
 
 from __future__ import annotations
 
+import datetime
 import json
 from typing import Any
 
@@ -299,3 +300,63 @@ class ReplyTextRequest(BaseModel):
     def to_content_json(self) -> str:
         """转换文本内容为 JSON 字符串。"""
         return json.dumps({"text": self.text}, ensure_ascii=False)
+
+
+# ══════════════════════════════════════════
+# Attendance 模型
+# ══════════════════════════════════════════
+
+
+class UserApproval(BaseModel):
+    """用户假勤审批记录（单条）。
+
+    一条 UserApproval 对应一个员工在某日的一项审批（请假/出差/外出/加班）。
+    飞书 API 返回的嵌套结构（leaves / trips / outs / overtime_works）已由
+    AttendanceService 展平为本模型的列表。
+
+    Attributes:
+        user_id: 员工 ID，类型由调用时的 user_id_type 决定（默认 open_id）
+        approval_date: 该审批覆盖的日期
+        approval_type: 审批类型。已知值：
+            - "leave"           请假
+            - "business_trip"   出差
+            - "external_visit"  外出
+            - "overtime"        加班
+            其他值可能存在，调用方应容忍未知类型。
+        approval_status: 审批状态。由 SDK 从 approve_pass_time 推断，飞书 API 不直接返回。
+            官方 status 枚举：0=待审批, 1=未通过, 2=已通过, 3=已撤回, 4=已撤销。
+        start_time: 审批时段开始时间，格式 "yyyy-MM-dd HH:mm:ss"
+        end_time: 审批时段结束时间，格式 "yyyy-MM-dd HH:mm:ss"
+        reason: 审批原因（部分类型可能为空）
+        leave_type: 请假子类型，仅 approval_type=="leave" 时有值
+            （如 "annual_leave"、"sick_leave"）
+        time_unit: 时间粒度。已知值："day"、"hour"、"half_day"、"half_hour"
+        duration: 时长，单位由 time_unit 决定
+    """
+
+    model_config = _OUT_CONFIG
+
+    user_id: str = Field(description="员工 ID（类型由 user_id_type 决定）")
+    approval_date: datetime.date = Field(description="审批覆盖的日期")
+    approval_type: str = Field(
+        description="审批类型：leave / business_trip / external_visit / overtime"
+    )
+    approval_status: int | None = Field(
+        default=None,
+        description=(
+            "审批状态。飞书 API 响应体不直接返回此字段，由 SDK 从 approve_pass_time 推断。\n"
+            "官方 status 枚举：0=待审批, 1=未通过, 2=已通过, 3=已撤回, 4=已撤销。\n"
+            "approve_pass_time 非空 → 2（已通过）；否则 → None（状态未知）。\n"
+            "leaves/overtime_works 接口本身仅返回已通过和已撤回记录。"
+        )
+    )
+    start_time: str = Field(description="审批时段开始，格式 yyyy-MM-dd HH:mm:ss")
+    end_time: str = Field(description="审批时段结束，格式 yyyy-MM-dd HH:mm:ss")
+    reason: str | None = Field(default=None, description="审批原因")
+    leave_type: str | None = Field(
+        default=None, description="请假子类型，仅 approval_type=='leave' 时有值"
+    )
+    time_unit: str | None = Field(
+        default=None, description="时长单位：day / hour / half_day / half_hour"
+    )
+    duration: float | None = Field(default=None, description="时长，单位由 time_unit 决定")
