@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2025-03-16
+
+### Added
+
+- feat(attendance): add attendance service for leave/overtime queries
+  - `get_user_approvals()` / `iter_user_approvals()` - Query user approval records
+  - Support leave, business_trip, external_visit, overtime approval types
+  - Batch processing for up to 50 users per call, auto-pagination for large user sets
+  - Unit conversion (day/half_day/hour/half_hour) from Feishu enum
+  - `approval_status` inference from `approve_pass_time`
+- feat(models): add `UserApproval` frozen model with computed `approval_status`
+
 ## [1.0.0] - 2025-03-09
 
 ### Added

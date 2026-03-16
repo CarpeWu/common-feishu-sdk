@@ -3,7 +3,7 @@
 ## 项目概述
 ylhp-common-feishu-sdk：基于飞书官方 lark-oapi SDK 的薄封装层，
 为公司内部提供一行代码调用飞书 API 的能力。
-三个 MVP 模块：Auth（H5授权登录）、Contact（组织架构）、Message（消息推送）。
+四个核心模块：Auth（H5授权登录）、Contact（组织架构）、Message（消息推送）、Attendance（假勤审批）。
 支持多应用场景：同一进程可同时操作多个飞书应用。
 
 ## 核心原则（必须遵守）
@@ -28,6 +28,7 @@ ylhp-common-feishu-sdk：基于飞书官方 lark-oapi SDK 的薄封装层，
 | reply_text | POST /im/v1/messages/:message_id/reply | client.im.v1.message.reply(req) | ReplyMessageRequest |
 | code→token | POST /authen/v1/oidc/access_token | client.authen.v1.oidc_access_token.create(req) | CreateOidcAccessTokenRequest |
 | token→user_info | GET /authen/v1/user_info | client.authen.v1.user_info.get(req) | GetUserInfoRequest |
+| get_user_approvals | POST /attendance/v1/user_approvals/query | client.attendance.v1.user_approval.query(req) | QueryUserApprovalRequest |
 
 ## 技术栈
 - Python >= 3.12

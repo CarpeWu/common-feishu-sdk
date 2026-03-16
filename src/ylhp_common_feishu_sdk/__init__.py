@@ -29,6 +29,7 @@
     feishu.auth       — H5 网页授权登录
     feishu.contacts   — 组织架构（部门、员工）
     feishu.messages   — 消息推送（文本、卡片）
+    feishu.attendance — 假勤审批（请假、加班等）
 
 异常体系:
     FeishuError           — 基类
@@ -46,7 +47,7 @@ import os
 
 README_PATH = os.path.join(os.path.dirname(__file__), "README.md")
 
-__version__ = "1.0.1"
+__version__ = "1.1.0"
 
 from ylhp_common_feishu_sdk.client import Feishu
 from ylhp_common_feishu_sdk.config import FeishuConfig

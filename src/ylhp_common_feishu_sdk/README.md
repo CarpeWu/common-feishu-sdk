@@ -116,6 +116,32 @@ msg_id = feishu.messages.send_card(receive_id="ou_xxx", card=card)
 reply_id = feishu.messages.reply_text(message_id=msg_id, text="Reply content")
 ```
 
+### 查询假勤审批
+
+```python
+from datetime import date
+
+# 查询单个用户的审批记录（单页）
+result = feishu.attendance.get_user_approvals(
+    user_ids=["ou_xxx"],
+    start_date=date(2025, 3, 1),
+    end_date=date(2025, 3, 15),
+)
+for approval in result.items:
+    print(f"{approval.user_id}: {approval.approval_type} on {approval.approval_date}")
+
+# 迭代获取多个用户的审批记录（自动分批、翻页）
+for approval in feishu.attendance.iter_user_approvals(
+    user_ids=["ou_xxx", "ou_yyy", "ou_zzz"],
+    start_date=date(2025, 3, 1),
+    end_date=date(2025, 3, 31),
+):
+    # approval_type: leave / business_trip / external_visit / overtime
+    # approval_status: 2=已通过（由 SDK 从 approve_pass_time 推断）
+    if approval.approval_status == 2:
+        print(f"{approval.user_id}: {approval.approval_type} approved")
+```
+
 ### 多应用场景
 
 ```python
@@ -217,6 +243,7 @@ except FeishuAPIError as e:
 | `auth` | `feishu.auth` | H5 授权登录 |
 | `contacts` | `feishu.contacts` | 组织架构（部门、员工） |
 | `messages` | `feishu.messages` | 消息推送（文本、卡片） |
+| `attendance` | `feishu.attendance` | 假勤审批（请假、加班等） |
 
 ## API 参考
 
@@ -255,6 +282,15 @@ except FeishuAPIError as e:
 | `"union_id"` | 用户 union_id |
 | `"chat_id"` | 群聊 ID |
 | `"email"` | 邮箱地址 |
+
+### AttendanceService
+
+| 方法 | 说明 | 返回类型 |
+|------|------|---------|
+| `get_user_approvals(user_ids, start_date, end_date, user_id_type="open_id", page_token=None)` | 查询用户审批记录（单页） | `PageResult[UserApproval]` |
+| `iter_user_approvals(user_ids, start_date, end_date, user_id_type="open_id")` | 迭代获取用户审批记录（自动分批、翻页） | `Iterator[UserApproval]` |
+
+**`user_id_type` 可选值**：`"open_id"`（默认）、`"employee_id"`、`"employee_no"`
 
 ## 返回类型
 
@@ -303,6 +339,23 @@ except FeishuAPIError as e:
 | `parent_department_id` | `str \| None` | 父部门 ID |
 | `leader_user_id` | `str \| None` | 部门主管用户 ID |
 | `member_count` | `int \| None` | 部门成员数量 |
+
+### UserApproval
+
+用户假勤审批记录（`get_user_approvals` 返回）。
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `user_id` | `str` | 员工 ID（类型由 user_id_type 决定） |
+| `approval_date` | `date` | 审批覆盖的日期 |
+| `approval_type` | `str` | 审批类型：leave / business_trip / external_visit / overtime |
+| `approval_status` | `int \| None` | 审批状态：2=已通过（由 SDK 从 approve_pass_time 推断） |
+| `start_time` | `str` | 审批时段开始，格式 yyyy-MM-dd HH:mm:ss |
+| `end_time` | `str` | 审批时段结束，格式 yyyy-MM-dd HH:mm:ss |
+| `reason` | `str \| None` | 审批原因 |
+| `leave_type` | `str \| None` | 请假子类型，仅 approval_type=='leave' 时有值 |
+| `time_unit` | `str \| None` | 时长单位：day / hour / half_day / half_hour |
+| `duration` | `float \| None` | 时长，单位由 time_unit 决定 |
 
 ### PageResult[T]
 
@@ -395,6 +448,7 @@ from ylhp_common_feishu_sdk import (
     UserDetail,
     Department,
     PageResult,
+    UserApproval,
 )
 ```
 
