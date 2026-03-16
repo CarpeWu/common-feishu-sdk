@@ -70,6 +70,7 @@ from ylhp_common_feishu_sdk.models import (
     ReplyTextRequest,
     SendMessageRequest,
     TextContent,
+    UserApproval,
     UserDetail,
     UserInfo,
 )
@@ -104,4 +105,6 @@ __all__ = [
     "CardContent",
     "SendMessageRequest",
     "ReplyTextRequest",
+    # Attendance Models
+    "UserApproval",
 ]

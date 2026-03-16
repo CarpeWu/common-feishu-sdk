@@ -17,6 +17,7 @@ import lark_oapi as lark
 from ylhp_common_feishu_sdk.config import FeishuConfig
 from ylhp_common_feishu_sdk.exceptions import FeishuConfigError
 from ylhp_common_feishu_sdk.log import setup_sdk_logger
+from ylhp_common_feishu_sdk.services.attendance import AttendanceService
 from ylhp_common_feishu_sdk.services.auth import AuthService
 from ylhp_common_feishu_sdk.services.contact import ContactService
 from ylhp_common_feishu_sdk.services.messaging import MessagingService
@@ -94,6 +95,7 @@ class Feishu:
         self.auth = AuthService(self._lark_client, self._config)
         self.messages = MessagingService(self._lark_client, self._config)
         self.contacts = ContactService(self._lark_client, self._config)
+        self.attendance = AttendanceService(self._lark_client, self._config)
 
     # ─── 命名注册表 API ───
 
