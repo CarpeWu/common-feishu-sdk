@@ -47,7 +47,7 @@ import os
 
 README_PATH = os.path.join(os.path.dirname(__file__), "README.md")
 
-__version__ = "1.1.0"
+__version__ = "1.1.1"
 
 from ylhp_common_feishu_sdk.client import Feishu
 from ylhp_common_feishu_sdk.config import FeishuConfig
